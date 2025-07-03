@@ -57,6 +57,8 @@ This is a comprehensive personal finance management application built with a mod
 - **Goals**: Financial goal setting and tracking
 - **Accounts**: Multi-account management
 - **Bills**: Bill reminder and payment tracking
+- **Categories**: Category management for organizing transactions
+- **Products**: Product database management for receipt scanning
 - **Reports**: Advanced analytics and data visualization
 - **Scanner**: Receipt scanning and product recognition
 
@@ -107,6 +109,7 @@ This is a comprehensive personal finance management application built with a mod
 ```
 Changelog:
 - July 03, 2025. Initial setup
+- July 03, 2025. Added Categories and Products management pages to sidebar navigation
 ```
 
 ## User Preferences

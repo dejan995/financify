@@ -12,7 +12,9 @@ import {
   ScanLine,
   PiggyBank,
   Menu,
-  X
+  X,
+  Package,
+  FolderTree
 } from "lucide-react";
 import { useState } from "react";
 
@@ -23,6 +25,8 @@ const navigation = [
   { name: "Goals", href: "/goals", icon: Target },
   { name: "Accounts", href: "/accounts", icon: CreditCard },
   { name: "Bill Reminders", href: "/bills", icon: Bell },
+  { name: "Categories", href: "/categories", icon: FolderTree },
+  { name: "Products", href: "/products", icon: Package },
   { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Receipt Scanner", href: "/scanner", icon: ScanLine },
 ];

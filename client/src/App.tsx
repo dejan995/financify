@@ -10,6 +10,8 @@ import Budgets from "@/pages/budgets";
 import Goals from "@/pages/goals";
 import Accounts from "@/pages/accounts";
 import Bills from "@/pages/bills";
+import Categories from "@/pages/categories";
+import Products from "@/pages/products";
 import Reports from "@/pages/reports";
 import Scanner from "@/pages/scanner";
 import Sidebar from "@/components/layout/sidebar";
@@ -26,6 +28,8 @@ function Router() {
           <Route path="/goals" component={Goals} />
           <Route path="/accounts" component={Accounts} />
           <Route path="/bills" component={Bills} />
+          <Route path="/categories" component={Categories} />
+          <Route path="/products" component={Products} />
           <Route path="/reports" component={Reports} />
           <Route path="/scanner" component={Scanner} />
           <Route component={NotFound} />
