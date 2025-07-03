@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import session from "express-session";
 import { storage } from "./storage";
+import { requireAuth, requireAdmin, requireActiveUser } from "./auth";
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
@@ -8,21 +10,195 @@ import {
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const CURRENT_USER_ID = 1; // Mock current user
+  // Session middleware
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'finance-app-secret-key-development',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Set to true in production with HTTPS
+      httpOnly: true,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    },
+  }));
+
+  // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ message: "Username and password required" });
+      }
+
+      const user = await storage.authenticateUser(username, password);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+
+      // Create session
+      const sessionId = await storage.createSession(user.id);
+      await storage.updateLastLogin(user.id);
+
+      (req.session as any).user = {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        isActive: user.isActive,
+        sessionId
+      };
+
+      res.json({ 
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          isActive: user.isActive,
+          forcePasswordChange: user.forcePasswordChange,
+          avatar: user.avatar
+        }
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    if ((req.session as any).user?.sessionId) {
+      storage.deleteSession((req.session as any).user.sessionId);
+    }
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  app.get("/api/auth/user", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).user.id;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+        forcePasswordChange: user.forcePasswordChange,
+        avatar: user.avatar,
+        phoneNumber: user.phoneNumber,
+        timezone: user.timezone,
+        currency: user.currency,
+        language: user.language,
+        emailNotifications: user.emailNotifications,
+        lastLogin: user.lastLogin
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.post("/api/auth/change-password", requireAuth, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = (req.session as any).user.id;
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ message: "Current and new passwords required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify current password
+      const { AuthService } = await import("./auth");
+      const isValidCurrent = await AuthService.verifyPassword(currentPassword, user.password);
+      if (!isValidCurrent) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Validate new password
+      if (!AuthService.isValidPassword(newPassword)) {
+        return res.status(400).json({ 
+          message: "Password must be at least 8 characters with uppercase, lowercase, and number" 
+        });
+      }
+
+      await storage.changePassword(userId, newPassword);
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  app.put("/api/auth/profile", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).user.id;
+      const updates = req.body;
+
+      // Remove sensitive fields
+      delete updates.id;
+      delete updates.password;
+      delete updates.role;
+      delete updates.createdAt;
+      delete updates.updatedAt;
+
+      const updatedUser = await storage.updateUserProfile(userId, updates);
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        id: updatedUser.id,
+        username: updatedUser.username,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role,
+        isActive: updatedUser.isActive,
+        avatar: updatedUser.avatar,
+        phoneNumber: updatedUser.phoneNumber,
+        timezone: updatedUser.timezone,
+        currency: updatedUser.currency,
+        language: updatedUser.language,
+        emailNotifications: updatedUser.emailNotifications
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // Helper function to get current user ID
+  const getCurrentUserId = (req: any): number => {
+    return req.session?.user?.id || 1; // Fallback for development
+  };
 
   // Accounts
-  app.get("/api/accounts", async (req, res) => {
+  app.get("/api/accounts", requireAuth, requireActiveUser, async (req, res) => {
     try {
-      const accounts = await storage.getAccounts(CURRENT_USER_ID);
+      const userId = getCurrentUserId(req);
+      const accounts = await storage.getAccounts(userId);
       res.json(accounts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch accounts" });
     }
   });
 
-  app.post("/api/accounts", async (req, res) => {
+  app.post("/api/accounts", requireAuth, requireActiveUser, async (req, res) => {
     try {
-      const data = insertAccountSchema.parse({ ...req.body, userId: CURRENT_USER_ID });
+      const userId = getCurrentUserId(req);
+      const data = insertAccountSchema.parse({ ...req.body, userId });
       const account = await storage.createAccount(data);
       res.json(account);
     } catch (error) {
@@ -30,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/accounts/:id", async (req, res) => {
+  app.put("/api/accounts/:id", requireAuth, requireActiveUser, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const data = insertAccountSchema.partial().parse(req.body);
@@ -58,18 +234,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Categories
-  app.get("/api/categories", async (req, res) => {
+  app.get("/api/categories", requireAuth, requireActiveUser, async (req, res) => {
     try {
-      const categories = await storage.getCategories(CURRENT_USER_ID);
+      const userId = getCurrentUserId(req);
+      const categories = await storage.getCategories(userId);
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch categories" });
     }
   });
 
-  app.post("/api/categories", async (req, res) => {
+  app.post("/api/categories", requireAuth, requireActiveUser, async (req, res) => {
     try {
-      const data = insertCategorySchema.parse({ ...req.body, userId: CURRENT_USER_ID });
+      const userId = getCurrentUserId(req);
+      const data = insertCategorySchema.parse({ ...req.body, userId });
       const category = await storage.createCategory(data);
       res.json(category);
     } catch (error) {
@@ -88,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: endDate as string,
         type: type as string,
       };
-      const transactions = await storage.getTransactions(CURRENT_USER_ID, filters);
+      const transactions = await storage.getTransactions(getCurrentUserId(req), filters);
       res.json(transactions);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch transactions" });
@@ -97,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/transactions", async (req, res) => {
     try {
-      const data = insertTransactionSchema.parse({ ...req.body, userId: CURRENT_USER_ID });
+      const data = insertTransactionSchema.parse({ ...req.body, userId: getCurrentUserId(req) });
       const transaction = await storage.createTransaction(data);
       res.json(transaction);
     } catch (error) {
@@ -135,7 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Budgets
   app.get("/api/budgets", async (req, res) => {
     try {
-      const budgets = await storage.getBudgets(CURRENT_USER_ID);
+      const budgets = await storage.getBudgets(getCurrentUserId(req));
       res.json(budgets);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch budgets" });
@@ -144,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/budgets", async (req, res) => {
     try {
-      const data = insertBudgetSchema.parse({ ...req.body, userId: CURRENT_USER_ID });
+      const data = insertBudgetSchema.parse({ ...req.body, userId: getCurrentUserId(req) });
       const budget = await storage.createBudget(data);
       res.json(budget);
     } catch (error) {
@@ -182,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Goals
   app.get("/api/goals", async (req, res) => {
     try {
-      const goals = await storage.getGoals(CURRENT_USER_ID);
+      const goals = await storage.getGoals(getCurrentUserId(req));
       res.json(goals);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch goals" });
@@ -191,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/goals", async (req, res) => {
     try {
-      const data = insertGoalSchema.parse({ ...req.body, userId: CURRENT_USER_ID });
+      const data = insertGoalSchema.parse({ ...req.body, userId: getCurrentUserId(req) });
       const goal = await storage.createGoal(data);
       res.json(goal);
     } catch (error) {
@@ -229,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bills
   app.get("/api/bills", async (req, res) => {
     try {
-      const bills = await storage.getBills(CURRENT_USER_ID);
+      const bills = await storage.getBills(getCurrentUserId(req));
       res.json(bills);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch bills" });
@@ -238,7 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/bills", async (req, res) => {
     try {
-      const data = insertBillSchema.parse({ ...req.body, userId: CURRENT_USER_ID });
+      const data = insertBillSchema.parse({ ...req.body, userId: getCurrentUserId(req) });
       const bill = await storage.createBill(data);
       res.json(bill);
     } catch (error) {
@@ -309,7 +487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin - User Management
-  app.get("/api/admin/users", async (req, res) => {
+  app.get("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -452,7 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics
   app.get("/api/analytics/balance", async (req, res) => {
     try {
-      const balance = await storage.getAccountBalance(CURRENT_USER_ID);
+      const balance = await storage.getAccountBalance(getCurrentUserId(req));
       res.json({ balance });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch balance" });
@@ -464,8 +642,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { month } = req.query;
       const currentMonth = month as string || new Date().toISOString().slice(0, 7);
       
-      const income = await storage.getMonthlyIncome(CURRENT_USER_ID, currentMonth);
-      const expenses = await storage.getMonthlyExpenses(CURRENT_USER_ID, currentMonth);
+      const income = await storage.getMonthlyIncome(getCurrentUserId(req), currentMonth);
+      const expenses = await storage.getMonthlyExpenses(getCurrentUserId(req), currentMonth);
       
       res.json({ income, expenses, savings: income - expenses });
     } catch (error) {
@@ -480,7 +658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const start = startDate as string || `${currentMonth}-01`;
       const end = endDate as string || `${currentMonth}-31`;
       
-      const spending = await storage.getCategorySpending(CURRENT_USER_ID, start, end);
+      const spending = await storage.getCategorySpending(getCurrentUserId(req), start, end);
       res.json(spending);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch category spending" });

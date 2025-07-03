@@ -12,6 +12,15 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  // Authentication
+  authenticateUser(username: string, password: string): Promise<User | null>;
+  createSession(userId: number): Promise<string>;
+  getSession(sessionId: string): Promise<{userId: number} | null>;
+  deleteSession(sessionId: string): Promise<boolean>;
+  updateLastLogin(userId: number): Promise<void>;
+  changePassword(userId: number, newPassword: string): Promise<boolean>;
+  updateUserProfile(userId: number, updates: Partial<InsertUser>): Promise<User | undefined>;
 
   // Accounts
   getAccounts(userId: number): Promise<Account[]>;
@@ -114,6 +123,7 @@ export class MemStorage implements IStorage {
   private products: Map<number, Product>;
   private systemConfigs: Map<string, SystemConfig>;
   private activityLogs: Map<number, ActivityLog>;
+  private sessions: Map<string, {userId: number, expiresAt: Date}>;
   private currentId: number;
 
   constructor() {
@@ -127,10 +137,14 @@ export class MemStorage implements IStorage {
     this.products = new Map();
     this.systemConfigs = new Map();
     this.activityLogs = new Map();
+    this.sessions = new Map();
     this.currentId = 1;
 
     // Initialize with default categories
     this.initializeDefaultCategories();
+    
+    // Create default admin user (async)
+    this.initializeDefaultAdmin().catch(console.error);
   }
 
   private initializeDefaultCategories() {
@@ -172,10 +186,14 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const user: User = {
-      ...insertUser,
       id: this.currentId++,
+      username: insertUser.username,
+      password: insertUser.password,
+      email: insertUser.email,
+      name: insertUser.name,
       role: insertUser.role || "user",
       isActive: insertUser.isActive ?? true,
+      forcePasswordChange: insertUser.forcePasswordChange ?? false,
       lastLogin: insertUser.lastLogin || null,
       preferences: insertUser.preferences || null,
       avatar: insertUser.avatar || null,
@@ -190,6 +208,94 @@ export class MemStorage implements IStorage {
     };
     this.users.set(user.id, user);
     return user;
+  }
+
+  // Authentication methods
+  async authenticateUser(username: string, password: string): Promise<User | null> {
+    const { AuthService } = await import("./auth");
+    const user = await this.getUserByUsername(username);
+    if (!user || !user.isActive) {
+      return null;
+    }
+    
+    const isValid = await AuthService.verifyPassword(password, user.password);
+    if (!isValid) {
+      return null;
+    }
+    
+    return user;
+  }
+
+  async createSession(userId: number): Promise<string> {
+    const { AuthService } = await import("./auth");
+    const sessionId = AuthService.generateSessionId();
+    const expiresAt = AuthService.createSessionExpiry();
+    
+    this.sessions.set(sessionId, { userId, expiresAt });
+    return sessionId;
+  }
+
+  async getSession(sessionId: string): Promise<{userId: number} | null> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return null;
+    }
+    
+    if (session.expiresAt < new Date()) {
+      this.sessions.delete(sessionId);
+      return null;
+    }
+    
+    return { userId: session.userId };
+  }
+
+  async deleteSession(sessionId: string): Promise<boolean> {
+    return this.sessions.delete(sessionId);
+  }
+
+  async updateLastLogin(userId: number): Promise<void> {
+    const user = this.users.get(userId);
+    if (user) {
+      user.lastLogin = new Date();
+      user.updatedAt = new Date();
+    }
+  }
+
+  async changePassword(userId: number, newPassword: string): Promise<boolean> {
+    const { AuthService } = await import("./auth");
+    const user = this.users.get(userId);
+    if (!user) {
+      return false;
+    }
+    
+    user.password = await AuthService.hashPassword(newPassword);
+    user.forcePasswordChange = false;
+    user.updatedAt = new Date();
+    return true;
+  }
+
+  async updateUserProfile(userId: number, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    Object.assign(user, updates, { updatedAt: new Date() });
+    return user;
+  }
+
+  private async initializeDefaultAdmin() {
+    const { AuthService } = await import("./auth");
+    
+    if (this.users.size === 0) {
+      const defaultAdmin = AuthService.generateDefaultAdminUser();
+      const hashedPassword = await AuthService.hashPassword(defaultAdmin.password);
+      
+      await this.createUser({
+        ...defaultAdmin,
+        password: hashedPassword,
+      });
+    }
   }
 
   // Accounts

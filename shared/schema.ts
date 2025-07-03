@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   role: text("role").notNull().default("user"), // user, admin
   isActive: boolean("is_active").notNull().default(true),
+  forcePasswordChange: boolean("force_password_change").notNull().default(false),
   lastLogin: timestamp("last_login"),
   preferences: text("preferences"), // JSON string for user preferences
   avatar: text("avatar"), // URL or base64 image
@@ -21,6 +22,14 @@ export const users = pgTable("users", {
   emailNotifications: boolean("email_notifications").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User sessions table for authentication
+export const userSessions = pgTable("user_sessions", {
+  id: text("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const accounts = pgTable("accounts", {
