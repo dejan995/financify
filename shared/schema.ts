@@ -2,7 +2,7 @@ import { pgTable, text, serial, integer, boolean, decimal, timestamp, date, varc
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table for Replit Auth
+// Session storage table for custom auth
 export const sessions = pgTable(
   "sessions",
   {
@@ -13,22 +13,31 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for Replit Auth
+// User storage table for custom auth
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 50 }).unique().notNull(),
+  email: varchar("email", { length: 255 }).unique().notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  profileImageUrl: varchar("profile_image_url", { length: 500 }),
+  role: varchar("role", { length: 20 }).notNull().default("user"), // user, admin
+  isActive: boolean("is_active").notNull().default(true),
+  isEmailVerified: boolean("is_email_verified").notNull().default(false),
+  emailVerificationToken: varchar("email_verification_token"),
+  passwordResetToken: varchar("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
+  lastLoginAt: timestamp("last_login_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 
 
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
+  userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   type: text("type").notNull(), // checking, savings, credit, investment
   balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -38,7 +47,7 @@ export const accounts = pgTable("accounts", {
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
+  userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   type: text("type").notNull(), // income, expense
   color: text("color").notNull().default("#0F766E"),
@@ -48,7 +57,7 @@ export const categories = pgTable("categories", {
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
+  userId: integer("user_id").notNull(),
   accountId: integer("account_id").notNull(),
   categoryId: integer("category_id").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
@@ -61,7 +70,7 @@ export const transactions = pgTable("transactions", {
 
 export const budgets = pgTable("budgets", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
+  userId: integer("user_id").notNull(),
   categoryId: integer("category_id").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   period: text("period").notNull().default("monthly"), // monthly, yearly
@@ -73,7 +82,7 @@ export const budgets = pgTable("budgets", {
 
 export const goals = pgTable("goals", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
+  userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   targetAmount: decimal("target_amount", { precision: 10, scale: 2 }).notNull(),
@@ -85,7 +94,7 @@ export const goals = pgTable("goals", {
 
 export const bills = pgTable("bills", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
+  userId: integer("user_id").notNull(),
   categoryId: integer("category_id").notNull(),
   accountId: integer("account_id").notNull(),
   name: text("name").notNull(),
@@ -134,8 +143,28 @@ export const activityLogs = pgTable("activity_logs", {
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
+  passwordHash: true,
+  emailVerificationToken: true,
+  passwordResetToken: true,
+  passwordResetExpires: true,
+  lastLoginAt: true,
+}).extend({
+  password: z.string().min(8, "Password must be at least 8 characters").max(100, "Password is too long"),
+});
+
+export const loginUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").max(50, "Username is too long"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const registerUserSchema = insertUserSchema.extend({
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({
@@ -185,7 +214,9 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type UpsertUser = InsertUser;
+export type LoginUser = z.infer<typeof loginUserSchema>;
+export type RegisterUser = z.infer<typeof registerUserSchema>;
+export type UpsertUser = Omit<User, 'id' | 'createdAt' | 'updatedAt'>;
 
 export type Account = typeof accounts.$inferSelect;
 export type InsertAccount = z.infer<typeof insertAccountSchema>;

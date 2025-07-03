@@ -3,8 +3,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useAuth } from "@/hooks/useAuth";
-// Simple sidebar for Replit Auth
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { 
   LayoutDashboard, 
@@ -42,18 +41,17 @@ const navigation = [
 export default function Sidebar() {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
 
-  // Simple logout handler for Replit Auth
-
   const handleLogout = () => {
-    // For Replit Auth, redirect directly to logout endpoint
-    window.location.href = '/api/logout';
+    logoutMutation.mutate();
   };
 
-  // Remove admin navigation since Replit Auth doesn't support roles
-  const filteredNavigation = navigation.filter(item => item.name !== "Admin");
+  // Show admin navigation based on user role
+  const filteredNavigation = navigation.filter(item => 
+    item.name !== "Admin" || (user && user.role === "admin")
+  );
 
   return (
     <>

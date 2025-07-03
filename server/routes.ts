@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, requireAuth, requireAdmin } from "./customAuth";
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
@@ -10,33 +10,18 @@ import {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
-  await setupAuth(app);
-
-  // Auth routes for Replit Auth
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  setupAuth(app);
 
   // Protected route examples
-  app.get("/api/protected", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
+  app.get("/api/protected", requireAuth, async (req: any, res) => {
+    const userId = req.user?.id;
     res.json({ message: "Access granted", userId });
   });
 
   // Accounts API
-  app.get("/api/accounts", isAuthenticated, async (req: any, res) => {
+  app.get("/api/accounts", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const accounts = await storage.getAccounts(userId);
       res.json(accounts);
     } catch (error) {
@@ -45,9 +30,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/accounts", isAuthenticated, async (req: any, res) => {
+  app.post("/api/accounts", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertAccountSchema.safeParse({
         ...req.body,
         userId
@@ -65,7 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/accounts/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/accounts/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const account = await storage.getAccount(id);
@@ -81,7 +66,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/accounts/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/accounts/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const result = insertAccountSchema.partial().safeParse(req.body);
@@ -102,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/accounts/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/accounts/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteAccount(id);
@@ -119,9 +104,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Categories API  
-  app.get("/api/categories", isAuthenticated, async (req: any, res) => {
+  app.get("/api/categories", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const categories = await storage.getCategories(userId);
       res.json(categories);
     } catch (error) {
@@ -130,9 +115,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/categories", isAuthenticated, async (req: any, res) => {
+  app.post("/api/categories", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertCategorySchema.safeParse({
         ...req.body,
         userId
@@ -151,9 +136,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transactions API
-  app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
+  app.get("/api/transactions", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { accountId, categoryId, startDate, endDate, type } = req.query;
       
       const filters = {
@@ -172,9 +157,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transactions", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertTransactionSchema.safeParse({
         ...req.body,
         userId
@@ -193,9 +178,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Budgets API
-  app.get("/api/budgets", isAuthenticated, async (req: any, res) => {
+  app.get("/api/budgets", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const budgets = await storage.getBudgets(userId);
       res.json(budgets);
     } catch (error) {
@@ -204,9 +189,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/budgets", isAuthenticated, async (req: any, res) => {
+  app.post("/api/budgets", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertBudgetSchema.safeParse({
         ...req.body,
         userId
@@ -225,9 +210,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Goals API
-  app.get("/api/goals", isAuthenticated, async (req: any, res) => {
+  app.get("/api/goals", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const goals = await storage.getGoals(userId);
       res.json(goals);
     } catch (error) {
@@ -236,9 +221,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/goals", isAuthenticated, async (req: any, res) => {
+  app.post("/api/goals", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertGoalSchema.safeParse({
         ...req.body,
         userId
@@ -257,9 +242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bills API
-  app.get("/api/bills", isAuthenticated, async (req: any, res) => {
+  app.get("/api/bills", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const bills = await storage.getBills(userId);
       res.json(bills);
     } catch (error) {
@@ -268,9 +253,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/bills", isAuthenticated, async (req: any, res) => {
+  app.post("/api/bills", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const result = insertBillSchema.safeParse({
         ...req.body,
         userId
@@ -330,7 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", isAuthenticated, async (req, res) => {
+  app.post("/api/products", requireAuth, async (req, res) => {
     try {
       const result = insertProductSchema.safeParse(req.body);
 
@@ -347,9 +332,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Analytics API
-  app.get("/api/analytics/balance", isAuthenticated, async (req: any, res) => {
+  app.get("/api/analytics/balance", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const balance = await storage.getAccountBalance(userId);
       res.json({ balance });
     } catch (error) {
@@ -358,9 +343,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/income/:month", isAuthenticated, async (req: any, res) => {
+  app.get("/api/analytics/income/:month", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { month } = req.params;
       const income = await storage.getMonthlyIncome(userId, month);
       res.json({ income });
@@ -370,9 +355,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/expenses/:month", isAuthenticated, async (req: any, res) => {
+  app.get("/api/analytics/expenses/:month", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { month } = req.params;
       const expenses = await storage.getMonthlyExpenses(userId, month);
       res.json({ expenses });
@@ -382,9 +367,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/category-spending", isAuthenticated, async (req: any, res) => {
+  app.get("/api/analytics/category-spending", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { startDate, endDate } = req.query;
       
       if (!startDate || !endDate) {

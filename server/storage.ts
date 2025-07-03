@@ -1,63 +1,51 @@
 import {
-  users,
-  accounts,
-  categories,
-  transactions,
-  budgets,
-  goals,
-  bills,
-  products,
-  systemConfig,
-  activityLogs,
-  type User,
-  type UpsertUser,
-  type Account,
-  type InsertAccount,
-  type Category,
-  type InsertCategory,
-  type Transaction,
-  type InsertTransaction,
-  type Budget,
-  type InsertBudget,
-  type Goal,
-  type InsertGoal,
-  type Bill,
-  type InsertBill,
-  type Product,
-  type InsertProduct,
-  type SystemConfig,
-  type InsertSystemConfig,
-  type ActivityLog,
-  type InsertActivityLog,
+  User,
+  Account,
+  Category,
+  Transaction,
+  Budget,
+  Goal,
+  Bill,
+  Product,
+  SystemConfig,
+  ActivityLog,
+  UpsertUser,
+  InsertAccount,
+  InsertCategory,
+  InsertTransaction,
+  InsertBudget,
+  InsertGoal,
+  InsertBill,
+  InsertProduct,
+  InsertSystemConfig,
+  InsertActivityLog,
 } from "@shared/schema";
 
 // Interface for storage operations
 export interface IStorage {
   // Users
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
-  
-  // Profile updates for Replit Auth users
-  updateUserProfile(userId: string, updates: Partial<UpsertUser>): Promise<User | undefined>;
+  updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined>;
 
   // Accounts
-  getAccounts(userId: string): Promise<Account[]>;
+  getAccounts(userId: number): Promise<Account[]>;
   getAccount(id: number): Promise<Account | undefined>;
   createAccount(account: InsertAccount): Promise<Account>;
   updateAccount(id: number, account: Partial<InsertAccount>): Promise<Account | undefined>;
   deleteAccount(id: number): Promise<boolean>;
 
   // Categories
-  getCategories(userId: string): Promise<Category[]>;
+  getCategories(userId: number): Promise<Category[]>;
   getCategory(id: number): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: number): Promise<boolean>;
 
   // Transactions
-  getTransactions(userId: string, filters?: {
+  getTransactions(userId: number, filters?: {
     accountId?: number;
     categoryId?: number;
     startDate?: string;
@@ -70,21 +58,21 @@ export interface IStorage {
   deleteTransaction(id: number): Promise<boolean>;
 
   // Budgets
-  getBudgets(userId: string): Promise<Budget[]>;
+  getBudgets(userId: number): Promise<Budget[]>;
   getBudget(id: number): Promise<Budget | undefined>;
   createBudget(budget: InsertBudget): Promise<Budget>;
   updateBudget(id: number, budget: Partial<InsertBudget>): Promise<Budget | undefined>;
   deleteBudget(id: number): Promise<boolean>;
 
   // Goals
-  getGoals(userId: string): Promise<Goal[]>;
+  getGoals(userId: number): Promise<Goal[]>;
   getGoal(id: number): Promise<Goal | undefined>;
   createGoal(goal: InsertGoal): Promise<Goal>;
   updateGoal(id: number, goal: Partial<InsertGoal>): Promise<Goal | undefined>;
   deleteGoal(id: number): Promise<boolean>;
 
   // Bills
-  getBills(userId: string): Promise<Bill[]>;
+  getBills(userId: number): Promise<Bill[]>;
   getBill(id: number): Promise<Bill | undefined>;
   createBill(bill: InsertBill): Promise<Bill>;
   updateBill(id: number, bill: Partial<InsertBill>): Promise<Bill | undefined>;
@@ -99,15 +87,14 @@ export interface IStorage {
   searchProducts(query: string): Promise<Product[]>;
 
   // Analytics
-  getAccountBalance(userId: string): Promise<number>;
-  getMonthlyIncome(userId: string, month: string): Promise<number>;
-  getMonthlyExpenses(userId: string, month: string): Promise<number>;
-  getCategorySpending(userId: string, startDate: string, endDate: string): Promise<{ categoryId: number; amount: number; categoryName: string }[]>;
+  getAccountBalance(userId: number): Promise<number>;
+  getMonthlyIncome(userId: number, month: string): Promise<number>;
+  getMonthlyExpenses(userId: number, month: string): Promise<number>;
+  getCategorySpending(userId: number, startDate: string, endDate: string): Promise<{ categoryId: number; amount: number; categoryName: string }[]>;
 
   // Admin - User Management
   getAllUsers(): Promise<User[]>;
-  updateUser(id: string, user: Partial<UpsertUser>): Promise<User | undefined>;
-  deleteUser(id: string): Promise<boolean>;
+  deleteUser(id: number): Promise<boolean>;
   getUserStats(): Promise<{ totalUsers: number; activeUsers: number; adminUsers: number }>;
 
   // Admin - System Configuration
@@ -133,7 +120,7 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private users: Map<number, User>;
   private accounts: Map<number, Account>;
   private categories: Map<number, Category>;
   private transactions: Map<number, Transaction>;
@@ -181,36 +168,30 @@ export class MemStorage implements IStorage {
       const category: Category = {
         id: this.currentId++,
         ...categoryData,
-        userId: "system",
+        userId: 0, // System categories
         parentId: null,
       };
       this.categories.set(category.id, category);
     });
   }
 
-  // User operations for Replit Auth
-  async getUser(id: string): Promise<User | undefined> {
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const user: User = {
-      id: userData.id,
-      email: userData.email,
-      firstName: userData.firstName,
-      lastName: userData.lastName,
-      profileImageUrl: userData.profileImageUrl,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.users.set(userData.id, user);
-    return user;
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    for (const user of this.users.values()) {
+      if (user.username === username) {
+        return user;
+      }
+    }
+    return undefined;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    // For Replit Auth, we might search by email since there's no username
+  async getUserByEmail(email: string): Promise<User | undefined> {
     for (const user of this.users.values()) {
-      if (user.email === username) {
+      if (user.email === email) {
         return user;
       }
     }
@@ -218,11 +199,30 @@ export class MemStorage implements IStorage {
   }
 
   async createUser(userData: UpsertUser): Promise<User> {
-    return this.upsertUser(userData);
+    const user: User = {
+      id: this.currentId++,
+      username: userData.username,
+      email: userData.email,
+      passwordHash: userData.passwordHash,
+      firstName: userData.firstName ?? null,
+      lastName: userData.lastName ?? null,
+      profileImageUrl: userData.profileImageUrl ?? null,
+      role: userData.role ?? "user",
+      isActive: userData.isActive ?? true,
+      isEmailVerified: userData.isEmailVerified ?? false,
+      emailVerificationToken: userData.emailVerificationToken ?? null,
+      passwordResetToken: userData.passwordResetToken ?? null,
+      passwordResetExpires: userData.passwordResetExpires ?? null,
+      lastLoginAt: userData.lastLoginAt ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(user.id, user);
+    return user;
   }
 
-  async updateUserProfile(userId: string, updates: Partial<UpsertUser>): Promise<User | undefined> {
-    const user = this.users.get(userId);
+  async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
     if (!user) return undefined;
 
     const updatedUser = {
@@ -230,12 +230,12 @@ export class MemStorage implements IStorage {
       ...updates,
       updatedAt: new Date(),
     };
-    this.users.set(userId, updatedUser);
+    this.users.set(id, updatedUser);
     return updatedUser;
   }
 
-  // Accounts
-  async getAccounts(userId: string): Promise<Account[]> {
+  // Account operations
+  async getAccounts(userId: number): Promise<Account[]> {
     return Array.from(this.accounts.values()).filter(account => account.userId === userId);
   }
 
@@ -246,8 +246,10 @@ export class MemStorage implements IStorage {
   async createAccount(insertAccount: InsertAccount): Promise<Account> {
     const account: Account = {
       id: this.currentId++,
-      ...insertAccount,
       createdAt: new Date(),
+      ...insertAccount,
+      balance: insertAccount.balance ?? "0",
+      isActive: insertAccount.isActive ?? true,
     };
     this.accounts.set(account.id, account);
     return account;
@@ -266,10 +268,10 @@ export class MemStorage implements IStorage {
     return this.accounts.delete(id);
   }
 
-  // Categories
-  async getCategories(userId: string): Promise<Category[]> {
+  // Category operations
+  async getCategories(userId: number): Promise<Category[]> {
     return Array.from(this.categories.values()).filter(category => 
-      category.isDefault || category.userId === userId
+      category.userId === userId || category.userId === 0 // Include system categories
     );
   }
 
@@ -281,6 +283,9 @@ export class MemStorage implements IStorage {
     const category: Category = {
       id: this.currentId++,
       ...insertCategory,
+      color: insertCategory.color ?? "#0F766E",
+      parentId: insertCategory.parentId ?? null,
+      isDefault: insertCategory.isDefault ?? false,
     };
     this.categories.set(category.id, category);
     return category;
@@ -299,17 +304,15 @@ export class MemStorage implements IStorage {
     return this.categories.delete(id);
   }
 
-  // Transactions
-  async getTransactions(userId: string, filters?: {
+  // Transaction operations
+  async getTransactions(userId: number, filters?: {
     accountId?: number;
     categoryId?: number;
     startDate?: string;
     endDate?: string;
     type?: string;
   }): Promise<Transaction[]> {
-    let transactions = Array.from(this.transactions.values()).filter(transaction => 
-      transaction.userId === userId
-    );
+    let transactions = Array.from(this.transactions.values()).filter(transaction => transaction.userId === userId);
 
     if (filters) {
       if (filters.accountId) {
@@ -329,7 +332,7 @@ export class MemStorage implements IStorage {
       }
     }
 
-    return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return transactions;
   }
 
   async getTransaction(id: number): Promise<Transaction | undefined> {
@@ -339,8 +342,9 @@ export class MemStorage implements IStorage {
   async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
     const transaction: Transaction = {
       id: this.currentId++,
-      ...insertTransaction,
       createdAt: new Date(),
+      ...insertTransaction,
+      notes: insertTransaction.notes ?? null,
     };
     this.transactions.set(transaction.id, transaction);
     return transaction;
@@ -359,8 +363,8 @@ export class MemStorage implements IStorage {
     return this.transactions.delete(id);
   }
 
-  // Budgets
-  async getBudgets(userId: string): Promise<Budget[]> {
+  // Budget operations
+  async getBudgets(userId: number): Promise<Budget[]> {
     return Array.from(this.budgets.values()).filter(budget => budget.userId === userId);
   }
 
@@ -371,8 +375,10 @@ export class MemStorage implements IStorage {
   async createBudget(insertBudget: InsertBudget): Promise<Budget> {
     const budget: Budget = {
       id: this.currentId++,
-      ...insertBudget,
       createdAt: new Date(),
+      ...insertBudget,
+      period: insertBudget.period ?? "monthly",
+      isActive: insertBudget.isActive ?? true,
     };
     this.budgets.set(budget.id, budget);
     return budget;
@@ -391,8 +397,8 @@ export class MemStorage implements IStorage {
     return this.budgets.delete(id);
   }
 
-  // Goals
-  async getGoals(userId: string): Promise<Goal[]> {
+  // Goal operations
+  async getGoals(userId: number): Promise<Goal[]> {
     return Array.from(this.goals.values()).filter(goal => goal.userId === userId);
   }
 
@@ -403,8 +409,12 @@ export class MemStorage implements IStorage {
   async createGoal(insertGoal: InsertGoal): Promise<Goal> {
     const goal: Goal = {
       id: this.currentId++,
-      ...insertGoal,
       createdAt: new Date(),
+      ...insertGoal,
+      description: insertGoal.description ?? null,
+      currentAmount: insertGoal.currentAmount ?? "0",
+      targetDate: insertGoal.targetDate ?? null,
+      isCompleted: insertGoal.isCompleted ?? false,
     };
     this.goals.set(goal.id, goal);
     return goal;
@@ -423,8 +433,8 @@ export class MemStorage implements IStorage {
     return this.goals.delete(id);
   }
 
-  // Bills
-  async getBills(userId: string): Promise<Bill[]> {
+  // Bill operations
+  async getBills(userId: number): Promise<Bill[]> {
     return Array.from(this.bills.values()).filter(bill => bill.userId === userId);
   }
 
@@ -435,8 +445,11 @@ export class MemStorage implements IStorage {
   async createBill(insertBill: InsertBill): Promise<Bill> {
     const bill: Bill = {
       id: this.currentId++,
-      ...insertBill,
       createdAt: new Date(),
+      ...insertBill,
+      notes: insertBill.notes ?? null,
+      isRecurring: insertBill.isRecurring ?? true,
+      isPaid: insertBill.isPaid ?? false,
     };
     this.bills.set(bill.id, bill);
     return bill;
@@ -455,7 +468,7 @@ export class MemStorage implements IStorage {
     return this.bills.delete(id);
   }
 
-  // Products
+  // Product operations
   async getProducts(): Promise<Product[]> {
     return Array.from(this.products.values());
   }
@@ -476,8 +489,13 @@ export class MemStorage implements IStorage {
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
     const product: Product = {
       id: this.currentId++,
-      ...insertProduct,
       createdAt: new Date(),
+      ...insertProduct,
+      barcode: insertProduct.barcode ?? null,
+      category: insertProduct.category ?? null,
+      brand: insertProduct.brand ?? null,
+      lastPrice: insertProduct.lastPrice ?? null,
+      averagePrice: insertProduct.averagePrice ?? null,
     };
     this.products.set(product.id, product);
     return product;
@@ -493,71 +511,70 @@ export class MemStorage implements IStorage {
   }
 
   async searchProducts(query: string): Promise<Product[]> {
-    const lowercaseQuery = query.toLowerCase();
-    return Array.from(this.products.values()).filter(product => 
-      product.name.toLowerCase().includes(lowercaseQuery) ||
-      product.brand?.toLowerCase().includes(lowercaseQuery) ||
-      product.category?.toLowerCase().includes(lowercaseQuery)
+    const products = Array.from(this.products.values());
+    return products.filter(product => 
+      product.name.toLowerCase().includes(query.toLowerCase()) ||
+      (product.brand && product.brand.toLowerCase().includes(query.toLowerCase())) ||
+      (product.category && product.category.toLowerCase().includes(query.toLowerCase()))
     );
   }
 
-  // Analytics
-  async getAccountBalance(userId: string): Promise<number> {
-    const userTransactions = await this.getTransactions(userId);
-    return userTransactions.reduce((balance, transaction) => {
-      const amount = parseFloat(transaction.amount);
-      return transaction.type === "income" ? balance + amount : balance - amount;
-    }, 0);
+  // Analytics operations
+  async getAccountBalance(userId: number): Promise<number> {
+    const accounts = await this.getAccounts(userId);
+    return accounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
   }
 
-  async getMonthlyIncome(userId: string, month: string): Promise<number> {
-    const userTransactions = await this.getTransactions(userId);
-    return userTransactions
-      .filter(t => t.type === "income" && t.date.startsWith(month))
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  async getMonthlyIncome(userId: number, month: string): Promise<number> {
+    const transactions = await this.getTransactions(userId, {
+      type: "income",
+      startDate: `${month}-01`,
+      endDate: `${month}-31`,
+    });
+    return transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
   }
 
-  async getMonthlyExpenses(userId: string, month: string): Promise<number> {
-    const userTransactions = await this.getTransactions(userId);
-    return userTransactions
-      .filter(t => t.type === "expense" && t.date.startsWith(month))
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+  async getMonthlyExpenses(userId: number, month: string): Promise<number> {
+    const transactions = await this.getTransactions(userId, {
+      type: "expense",
+      startDate: `${month}-01`,
+      endDate: `${month}-31`,
+    });
+    return transactions.reduce((sum, transaction) => sum + parseFloat(transaction.amount), 0);
   }
 
-  async getCategorySpending(userId: string, startDate: string, endDate: string): Promise<{ categoryId: number; amount: number; categoryName: string }[]> {
-    const userTransactions = await this.getTransactions(userId, { startDate, endDate });
-    const categorySpending = new Map<number, number>();
+  async getCategorySpending(userId: number, startDate: string, endDate: string): Promise<{ categoryId: number; amount: number; categoryName: string }[]> {
+    const transactions = await this.getTransactions(userId, {
+      type: "expense",
+      startDate,
+      endDate,
+    });
 
-    userTransactions
-      .filter(t => t.type === "expense")
-      .forEach(transaction => {
-        const current = categorySpending.get(transaction.categoryId) || 0;
-        categorySpending.set(transaction.categoryId, current + parseFloat(transaction.amount));
-      });
+    const spending = new Map<number, number>();
+    for (const transaction of transactions) {
+      const current = spending.get(transaction.categoryId) || 0;
+      spending.set(transaction.categoryId, current + parseFloat(transaction.amount));
+    }
 
     const result = [];
-    for (const [categoryId, amount] of categorySpending.entries()) {
+    for (const [categoryId, amount] of spending.entries()) {
       const category = await this.getCategory(categoryId);
       result.push({
         categoryId,
         amount,
-        categoryName: category?.name || "Unknown"
+        categoryName: category?.name || "Unknown",
       });
     }
 
     return result;
   }
 
-  // Admin methods
+  // Admin - User Management
   async getAllUsers(): Promise<User[]> {
     return Array.from(this.users.values());
   }
 
-  async updateUser(id: string, userData: Partial<UpsertUser>): Promise<User | undefined> {
-    return this.updateUserProfile(id, userData);
-  }
-
-  async deleteUser(id: string): Promise<boolean> {
+  async deleteUser(id: number): Promise<boolean> {
     return this.users.delete(id);
   }
 
@@ -565,8 +582,8 @@ export class MemStorage implements IStorage {
     const users = Array.from(this.users.values());
     return {
       totalUsers: users.length,
-      activeUsers: users.length, // All users are considered active in this simple implementation
-      adminUsers: 0, // No admin concept in Replit Auth
+      activeUsers: users.filter(u => u.isActive).length,
+      adminUsers: users.filter(u => u.role === "admin").length,
     };
   }
 
@@ -584,7 +601,6 @@ export class MemStorage implements IStorage {
     const config: SystemConfig = {
       id: this.currentId++,
       ...insertConfig,
-      createdAt: new Date(),
       updatedAt: new Date(),
     };
     this.systemConfigs.set(config.key, config);
@@ -610,27 +626,31 @@ export class MemStorage implements IStorage {
 
     if (filters) {
       if (filters.userId) {
-        logs = logs.filter(l => l.userId === filters.userId);
+        logs = logs.filter(log => log.userId === filters.userId);
       }
       if (filters.action) {
-        logs = logs.filter(l => l.action === filters.action);
+        logs = logs.filter(log => log.action === filters.action);
       }
       if (filters.resource) {
-        logs = logs.filter(l => l.resource === filters.resource);
+        logs = logs.filter(log => log.resource === filters.resource);
       }
       if (filters.limit) {
         logs = logs.slice(0, filters.limit);
       }
     }
 
-    return logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return logs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
     const log: ActivityLog = {
       id: this.currentId++,
-      ...insertLog,
       createdAt: new Date(),
+      ...insertLog,
+      resourceId: insertLog.resourceId ?? null,
+      details: insertLog.details ?? null,
+      ipAddress: insertLog.ipAddress ?? null,
+      userAgent: insertLog.userAgent ?? null,
     };
     this.activityLogs.set(log.id, log);
     return log;
@@ -642,7 +662,7 @@ export class MemStorage implements IStorage {
 
     let deletedCount = 0;
     for (const [id, log] of this.activityLogs.entries()) {
-      if (new Date(log.createdAt) < cutoffDate) {
+      if (log.createdAt < cutoffDate) {
         this.activityLogs.delete(id);
         deletedCount++;
       }
@@ -651,7 +671,6 @@ export class MemStorage implements IStorage {
     return deletedCount;
   }
 
-  // System Analytics
   async getSystemStats(): Promise<{
     totalTransactions: number;
     totalAccounts: number;
