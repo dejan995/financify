@@ -110,6 +110,8 @@ This is a comprehensive personal finance management application built with a mod
 Changelog:
 - July 03, 2025. Initial setup
 - July 03, 2025. Added Categories and Products management pages to sidebar navigation
+- July 03, 2025. Fixed comprehensive theming system with text-danger to text-destructive replacement
+- July 03, 2025. Improved color contrast: darker green in light mode, lighter red in dark mode
 ```
 
 ## User Preferences

@@ -19,8 +19,8 @@
   --primary: hsl(201, 100%, 50%);
   --primary-foreground: hsl(0, 0%, 100%);
   
-  /* Secondary: Logo green (#00ff8f) */
-  --secondary: hsl(153, 100%, 50%);
+  /* Secondary: Logo green (#00ff8f) - darker for better contrast in light mode */
+  --secondary: hsl(153, 100%, 35%);
   --secondary-foreground: hsl(222, 84%, 4.9%);
   
   /* Accent: Light blue variation */
@@ -70,7 +70,7 @@
   --accent: hsl(201, 50%, 15%);
   --accent-foreground: hsl(201, 100%, 80%);
   
-  --destructive: hsl(0, 63%, 31%);
+  --destructive: hsl(0, 70%, 50%);
   --destructive-foreground: hsl(210, 40%, 98%);
   --warning: hsl(36, 93%, 47%);
   --warning-foreground: hsl(210, 40%, 98%);
