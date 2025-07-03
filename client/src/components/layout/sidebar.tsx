@@ -3,6 +3,10 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useAuth } from "@/hooks/useAuth";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -16,7 +20,9 @@ import {
   X,
   Package,
   FolderTree,
-  Settings
+  Settings,
+  LogOut,
+  User
 } from "lucide-react";
 import { useState } from "react";
 
@@ -37,6 +43,40 @@ const navigation = [
 export default function Sidebar() {
   const [location] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { user, isAdmin } = useAuth();
+  const { toast } = useToast();
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/auth/logout", {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of your account.",
+      });
+      window.location.reload();
+    },
+    onError: (error) => {
+      toast({
+        title: "Logout failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  // Filter navigation based on user role
+  const filteredNavigation = navigation.filter(item => {
+    if (item.name === "Admin") {
+      return isAdmin;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -72,7 +112,7 @@ export default function Sidebar() {
         </div>
         
         <nav className="mt-6 px-3 space-y-1">
-          {navigation.map((item) => {
+          {filteredNavigation.map((item) => {
             const isActive = location === item.href;
             return (
               <Link key={item.name} href={item.href}>
@@ -94,17 +134,29 @@ export default function Sidebar() {
         </nav>
         
         <div className="absolute bottom-0 w-full p-4 border-t border-sidebar-border">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center">
               <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center text-sidebar-primary-foreground text-sm font-medium">
-                JD
+                {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-sidebar-foreground">John Doe</p>
-                <p className="text-xs text-sidebar-foreground/60">Premium Plan</p>
+                <p className="text-sm font-medium text-sidebar-foreground">{user?.name || user?.username}</p>
+                <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.role || "User"}</p>
               </div>
             </div>
             <ThemeToggle />
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              disabled={logoutMutation.isPending}
+              className="flex-1 justify-start text-sidebar-foreground hover:bg-sidebar-accent"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              {logoutMutation.isPending ? "Logging out..." : "Logout"}
+            </Button>
           </div>
         </div>
       </aside>

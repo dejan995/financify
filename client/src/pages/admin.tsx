@@ -23,10 +23,13 @@ import {
 } from "lucide-react";
 import type { User, InsertUser } from "@shared/schema";
 
-const userFormSchema = z.object({
+const createUserFormSchema = (isEdit: boolean = false) => z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
   name: z.string().min(2, "Name must be at least 2 characters"),
+  password: isEdit 
+    ? z.string().optional()
+    : z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["admin", "user", "guest"]),
   isActive: z.boolean(),
   phoneNumber: z.string().optional(),
@@ -36,7 +39,7 @@ const userFormSchema = z.object({
   emailNotifications: z.boolean(),
 });
 
-type UserFormData = z.infer<typeof userFormSchema>;
+type UserFormData = z.infer<ReturnType<typeof createUserFormSchema>>;
 
 interface UserFormProps {
   onClose: () => void;
@@ -47,11 +50,12 @@ function UserForm({ onClose, user }: UserFormProps) {
   const { toast } = useToast();
   
   const form = useForm<UserFormData>({
-    resolver: zodResolver(userFormSchema),
+    resolver: zodResolver(createUserFormSchema(!!user)),
     defaultValues: {
       username: user?.username || "",
       email: user?.email || "",
       name: user?.name || "",
+      password: "",
       role: user?.role as "admin" | "user" | "guest" || "user",
       isActive: user?.isActive ?? true,
       phoneNumber: user?.phoneNumber || "",
@@ -144,6 +148,22 @@ function UserForm({ onClose, user }: UserFormProps) {
             </FormItem>
           )}
         />
+
+        {!user && (
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} placeholder="Enter initial password" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <FormField
