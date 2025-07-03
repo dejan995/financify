@@ -46,9 +46,6 @@ export default function Categories() {
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <h2 className="text-2xl font-semibold text-gray-800">Categories</h2>
-            <p className="text-muted-foreground">
-              Organize your transactions with custom categories
-            </p>
           </div>
           <Button onClick={() => setIsFormOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
