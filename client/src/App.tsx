@@ -16,7 +16,7 @@ import Products from "@/pages/products";
 import Reports from "@/pages/reports";
 import Scanner from "@/pages/scanner";
 import Admin from "@/pages/admin";
-import LoginPage from "@/pages/login";
+import LandingPage from "@/pages/landing";
 import Sidebar from "@/components/layout/sidebar";
 
 function AuthenticatedApp() {
@@ -34,7 +34,7 @@ function AuthenticatedApp() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={() => window.location.reload()} />;
+    return <LandingPage />;
   }
 
   return (

@@ -1,40 +1,34 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, date, varchar, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Session storage table for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table for Replit Auth
 export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  role: text("role").notNull().default("user"), // user, admin
-  isActive: boolean("is_active").notNull().default(true),
-  forcePasswordChange: boolean("force_password_change").notNull().default(false),
-  lastLogin: timestamp("last_login"),
-  preferences: text("preferences"), // JSON string for user preferences
-  avatar: text("avatar"), // URL or base64 image
-  phoneNumber: text("phone_number"),
-  dateOfBirth: date("date_of_birth"),
-  timezone: text("timezone").default("UTC"),
-  currency: text("currency").default("USD"),
-  language: text("language").default("en"),
-  emailNotifications: boolean("email_notifications").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  id: varchar("id").primaryKey().notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// User sessions table for authentication
-export const userSessions = pgTable("user_sessions", {
-  id: text("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+
 
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   type: text("type").notNull(), // checking, savings, credit, investment
   balance: decimal("balance", { precision: 10, scale: 2 }).notNull().default("0"),
@@ -44,7 +38,7 @@ export const accounts = pgTable("accounts", {
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   type: text("type").notNull(), // income, expense
   color: text("color").notNull().default("#0F766E"),
@@ -54,7 +48,7 @@ export const categories = pgTable("categories", {
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   accountId: integer("account_id").notNull(),
   categoryId: integer("category_id").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
@@ -67,7 +61,7 @@ export const transactions = pgTable("transactions", {
 
 export const budgets = pgTable("budgets", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   categoryId: integer("category_id").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   period: text("period").notNull().default("monthly"), // monthly, yearly
@@ -79,7 +73,7 @@ export const budgets = pgTable("budgets", {
 
 export const goals = pgTable("goals", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   targetAmount: decimal("target_amount", { precision: 10, scale: 2 }).notNull(),
@@ -91,7 +85,7 @@ export const goals = pgTable("goals", {
 
 export const bills = pgTable("bills", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: varchar("user_id").notNull(),
   categoryId: integer("category_id").notNull(),
   accountId: integer("account_id").notNull(),
   name: text("name").notNull(),
@@ -140,8 +134,8 @@ export const activityLogs = pgTable("activity_logs", {
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({
@@ -191,6 +185,7 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = InsertUser;
 
 export type Account = typeof accounts.$inferSelect;
 export type InsertAccount = z.infer<typeof insertAccountSchema>;
