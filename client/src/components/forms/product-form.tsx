@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { QrCode, Scan } from "lucide-react";
 
 const formSchema = insertProductSchema.extend({
   lastPrice: z.string().optional(),
@@ -26,6 +28,7 @@ interface ProductFormProps {
 export default function ProductForm({ onClose, product }: ProductFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isScanning, setIsScanning] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -116,6 +119,40 @@ export default function ProductForm({ onClose, product }: ProductFormProps) {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const handleScanBarcode = () => {
+    setIsScanning(true);
+    // Simulate barcode scanning with browser-based camera
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then((stream) => {
+          // In a real implementation, you'd use a library like QuaggaJS or ZXing
+          // For now, we'll show a placeholder dialog
+          toast({
+            title: "Camera Access",
+            description: "Barcode scanning would open camera interface here. For now, please enter barcode manually.",
+          });
+          setIsScanning(false);
+          stream.getTracks().forEach(track => track.stop());
+        })
+        .catch(() => {
+          toast({
+            title: "Camera Error",
+            description: "Unable to access camera. Please enter barcode manually.",
+            variant: "destructive",
+          });
+          setIsScanning(false);
+        });
+    } else {
+      toast({
+        title: "Not Supported",
+        description: "Camera access not supported. Please enter barcode manually.",
+        variant: "destructive",
+      });
+      setIsScanning(false);
+    }
+  };
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -153,7 +190,11 @@ export default function ProductForm({ onClose, product }: ProductFormProps) {
                 <FormItem>
                   <FormLabel>Brand (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Apple, Samsung, Dole" {...field} />
+                    <Input 
+                      placeholder="e.g., Apple, Samsung, Dole" 
+                      {...field}
+                      value={field.value || ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -168,7 +209,11 @@ export default function ProductForm({ onClose, product }: ProductFormProps) {
                 <FormItem>
                   <FormLabel>Category (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Electronics, Food, Clothing" {...field} />
+                    <Input 
+                      placeholder="e.g., Electronics, Food, Clothing" 
+                      {...field}
+                      value={field.value || ""}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -183,7 +228,27 @@ export default function ProductForm({ onClose, product }: ProductFormProps) {
                 <FormItem>
                   <FormLabel>Barcode (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., 1234567890123" {...field} />
+                    <div className="flex gap-2">
+                      <Input 
+                        placeholder="e.g., 1234567890123" 
+                        {...field}
+                        value={field.value || ""}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleScanBarcode}
+                        disabled={isScanning}
+                        className="shrink-0"
+                      >
+                        {isScanning ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        ) : (
+                          <QrCode className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
