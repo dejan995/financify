@@ -3,68 +3,88 @@
 @tailwind utilities;
 
 :root {
+  /* Logo-inspired palette - Light theme */
   --background: hsl(0, 0%, 100%);
-  --foreground: hsl(20, 14.3%, 4.1%);
+  --foreground: hsl(222, 84%, 4.9%);
   --muted: hsl(210, 40%, 98%);
-  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --muted-foreground: hsl(215, 16%, 47%);
   --popover: hsl(0, 0%, 100%);
-  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --popover-foreground: hsl(222, 84%, 4.9%);
   --card: hsl(0, 0%, 100%);
-  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --card-foreground: hsl(222, 84%, 4.9%);
   --border: hsl(214, 32%, 91%);
   --input: hsl(214, 32%, 91%);
-  --primary: hsl(175, 82%, 22%);
-  --primary-foreground: hsl(210, 40%, 98%);
-  --secondary: hsl(210, 40%, 96%);
-  --secondary-foreground: hsl(222, 47%, 11%);
-  --accent: hsl(160, 84%, 39%);
-  --accent-foreground: hsl(210, 40%, 98%);
+  
+  /* Primary: Logo blue (#00a1ff) */
+  --primary: hsl(201, 100%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  
+  /* Secondary: Logo green (#00ff8f) */
+  --secondary: hsl(153, 100%, 50%);
+  --secondary-foreground: hsl(222, 84%, 4.9%);
+  
+  /* Accent: Light blue variation */
+  --accent: hsl(201, 100%, 95%);
+  --accent-foreground: hsl(201, 100%, 20%);
+  
   --destructive: hsl(0, 84%, 60%);
   --destructive-foreground: hsl(210, 40%, 98%);
   --warning: hsl(36, 93%, 47%);
   --warning-foreground: hsl(210, 40%, 98%);
-  --ring: hsl(175, 82%, 22%);
+  --ring: hsl(201, 100%, 50%);
   --radius: 0.75rem;
-  --sidebar-background: hsl(0, 0%, 100%);
-  --sidebar-foreground: hsl(20, 14.3%, 4.1%);
-  --sidebar-primary: hsl(175, 82%, 22%);
-  --sidebar-primary-foreground: hsl(210, 40%, 98%);
-  --sidebar-accent: hsl(210, 40%, 96%);
-  --sidebar-accent-foreground: hsl(222, 47%, 11%);
+  
+  /* Sidebar colors */
+  --sidebar-background: hsl(0, 0%, 98%);
+  --sidebar-foreground: hsl(222, 84%, 4.9%);
+  --sidebar-primary: hsl(201, 100%, 50%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(201, 100%, 95%);
+  --sidebar-accent-foreground: hsl(201, 100%, 20%);
   --sidebar-border: hsl(214, 32%, 91%);
-  --sidebar-ring: hsl(175, 82%, 22%);
+  --sidebar-ring: hsl(201, 100%, 50%);
 }
 
 .dark {
-  --background: hsl(224, 71%, 4%);
-  --foreground: hsl(213, 31%, 91%);
-  --muted: hsl(223, 47%, 11%);
+  /* Logo-inspired palette - Dark theme */
+  --background: hsl(222, 84%, 4.9%);
+  --foreground: hsl(210, 40%, 98%);
+  --muted: hsl(217, 33%, 17%);
   --muted-foreground: hsl(215, 20%, 65%);
-  --popover: hsl(224, 71%, 4%);
-  --popover-foreground: hsl(215, 20%, 65%);
-  --card: hsl(224, 71%, 4%);
-  --card-foreground: hsl(213, 31%, 91%);
-  --border: hsl(216, 34%, 17%);
-  --input: hsl(216, 34%, 17%);
-  --primary: hsl(175, 82%, 22%);
-  --primary-foreground: hsl(210, 40%, 98%);
-  --secondary: hsl(222, 47%, 11%);
-  --secondary-foreground: hsl(210, 40%, 98%);
-  --accent: hsl(216, 34%, 17%);
-  --accent-foreground: hsl(210, 40%, 98%);
+  --popover: hsl(217, 33%, 17%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsl(217, 33%, 17%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(217, 33%, 17%);
+  --input: hsl(217, 33%, 17%);
+  
+  /* Primary: Brighter logo blue for dark mode */
+  --primary: hsl(201, 100%, 60%);
+  --primary-foreground: hsl(222, 84%, 4.9%);
+  
+  /* Secondary: Brighter logo green for dark mode */
+  --secondary: hsl(153, 100%, 60%);
+  --secondary-foreground: hsl(222, 84%, 4.9%);
+  
+  /* Accent: Dark blue variation */
+  --accent: hsl(201, 50%, 15%);
+  --accent-foreground: hsl(201, 100%, 80%);
+  
   --destructive: hsl(0, 63%, 31%);
   --destructive-foreground: hsl(210, 40%, 98%);
   --warning: hsl(36, 93%, 47%);
   --warning-foreground: hsl(210, 40%, 98%);
-  --ring: hsl(216, 34%, 17%);
-  --sidebar-background: hsl(224, 71%, 4%);
-  --sidebar-foreground: hsl(213, 31%, 91%);
-  --sidebar-primary: hsl(175, 82%, 22%);
-  --sidebar-primary-foreground: hsl(210, 40%, 98%);
-  --sidebar-accent: hsl(216, 34%, 17%);
-  --sidebar-accent-foreground: hsl(210, 40%, 98%);
-  --sidebar-border: hsl(216, 34%, 17%);
-  --sidebar-ring: hsl(216, 34%, 17%);
+  --ring: hsl(201, 100%, 60%);
+  
+  /* Sidebar colors for dark theme */
+  --sidebar-background: hsl(217, 33%, 10%);
+  --sidebar-foreground: hsl(210, 40%, 98%);
+  --sidebar-primary: hsl(201, 100%, 60%);
+  --sidebar-primary-foreground: hsl(222, 84%, 4.9%);
+  --sidebar-accent: hsl(201, 50%, 15%);
+  --sidebar-accent-foreground: hsl(201, 100%, 80%);
+  --sidebar-border: hsl(217, 33%, 17%);
+  --sidebar-ring: hsl(201, 100%, 60%);
 }
 
 @layer base {

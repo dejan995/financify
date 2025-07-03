@@ -2,6 +2,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -17,7 +18,6 @@ import {
   FolderTree
 } from "lucide-react";
 import { useState } from "react";
-// No import needed for public assets
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -92,14 +92,17 @@ export default function Sidebar() {
         </nav>
         
         <div className="absolute bottom-0 w-full p-4 border-t border-sidebar-border">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center text-sidebar-primary-foreground text-sm font-medium">
-              JD
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center text-sidebar-primary-foreground text-sm font-medium">
+                JD
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-sidebar-foreground">John Doe</p>
+                <p className="text-xs text-sidebar-foreground/60">Premium Plan</p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-sidebar-foreground">John Doe</p>
-              <p className="text-xs text-sidebar-foreground/60">Premium Plan</p>
-            </div>
+            <ThemeToggle />
           </div>
         </div>
       </aside>
