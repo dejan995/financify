@@ -17,6 +17,7 @@ import {
   FolderTree
 } from "lucide-react";
 import { useState } from "react";
+// No import needed for public assets
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -61,7 +62,11 @@ export default function Sidebar() {
         isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
       )}>
         <div className="flex items-center justify-center h-16 px-6 border-b border-sidebar-border">
-          <h1 className="text-xl font-bold text-sidebar-primary">FinanceTracker Pro</h1>
+          <img 
+            src="/logo.svg" 
+            alt="FinanceTracker Pro" 
+            className="h-8 w-auto object-contain"
+          />
         </div>
         
         <nav className="mt-6 px-3 space-y-1">
