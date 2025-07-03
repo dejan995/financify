@@ -14,6 +14,7 @@ import Categories from "@/pages/categories";
 import Products from "@/pages/products";
 import Reports from "@/pages/reports";
 import Scanner from "@/pages/scanner";
+import Admin from "@/pages/admin";
 import Sidebar from "@/components/layout/sidebar";
 
 function Router() {
@@ -32,6 +33,7 @@ function Router() {
           <Route path="/products" component={Products} />
           <Route path="/reports" component={Reports} />
           <Route path="/scanner" component={Scanner} />
+          <Route path="/admin" component={Admin} />
           <Route component={NotFound} />
         </Switch>
       </main>

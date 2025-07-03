@@ -1,9 +1,10 @@
 import { 
-  users, accounts, categories, transactions, budgets, goals, bills, products,
+  users, accounts, categories, transactions, budgets, goals, bills, products, systemConfig, activityLogs,
   type User, type InsertUser, type Account, type InsertAccount, 
   type Category, type InsertCategory, type Transaction, type InsertTransaction,
   type Budget, type InsertBudget, type Goal, type InsertGoal,
-  type Bill, type InsertBill, type Product, type InsertProduct
+  type Bill, type InsertBill, type Product, type InsertProduct,
+  type SystemConfig, type InsertSystemConfig, type ActivityLog, type InsertActivityLog
 } from "@shared/schema";
 
 export interface IStorage {
@@ -73,6 +74,33 @@ export interface IStorage {
   getMonthlyIncome(userId: number, month: string): Promise<number>;
   getMonthlyExpenses(userId: number, month: string): Promise<number>;
   getCategorySpending(userId: number, startDate: string, endDate: string): Promise<{ categoryId: number; amount: number; categoryName: string }[]>;
+
+  // Admin - User Management
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
+  getUserStats(): Promise<{ totalUsers: number; activeUsers: number; adminUsers: number }>;
+
+  // Admin - System Configuration
+  getSystemConfigs(category?: string): Promise<SystemConfig[]>;
+  getSystemConfig(key: string): Promise<SystemConfig | undefined>;
+  createSystemConfig(config: InsertSystemConfig): Promise<SystemConfig>;
+  updateSystemConfig(key: string, config: Partial<InsertSystemConfig>): Promise<SystemConfig | undefined>;
+  deleteSystemConfig(key: string): Promise<boolean>;
+
+  // Admin - Activity Logs
+  getActivityLogs(filters?: { userId?: number; action?: string; resource?: string; limit?: number }): Promise<ActivityLog[]>;
+  createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+  deleteActivityLogs(olderThanDays: number): Promise<number>;
+
+  // Admin - System Analytics
+  getSystemStats(): Promise<{
+    totalTransactions: number;
+    totalAccounts: number;
+    totalCategories: number;
+    totalProducts: number;
+    systemHealth: string;
+  }>;
 }
 
 export class MemStorage implements IStorage {
@@ -84,6 +112,8 @@ export class MemStorage implements IStorage {
   private goals: Map<number, Goal>;
   private bills: Map<number, Bill>;
   private products: Map<number, Product>;
+  private systemConfigs: Map<string, SystemConfig>;
+  private activityLogs: Map<number, ActivityLog>;
   private currentId: number;
 
   constructor() {
@@ -95,6 +125,8 @@ export class MemStorage implements IStorage {
     this.goals = new Map();
     this.bills = new Map();
     this.products = new Map();
+    this.systemConfigs = new Map();
+    this.activityLogs = new Map();
     this.currentId = 1;
 
     // Initialize with default categories
@@ -142,7 +174,19 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id: this.currentId++,
+      role: insertUser.role || "user",
+      isActive: insertUser.isActive ?? true,
+      lastLogin: insertUser.lastLogin || null,
+      preferences: insertUser.preferences || null,
+      avatar: insertUser.avatar || null,
+      phoneNumber: insertUser.phoneNumber || null,
+      dateOfBirth: insertUser.dateOfBirth || null,
+      timezone: insertUser.timezone || "UTC",
+      currency: insertUser.currency || "USD",
+      language: insertUser.language || "en",
+      emailNotifications: insertUser.emailNotifications ?? true,
       createdAt: new Date(),
+      updatedAt: new Date(),
     };
     this.users.set(user.id, user);
     return user;
@@ -484,6 +528,148 @@ export class MemStorage implements IStorage {
     }
 
     return result.sort((a, b) => b.amount - a.amount);
+  }
+
+  // Admin - User Management
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (user) {
+      const updatedUser = { ...user, ...userData, updatedAt: new Date() };
+      this.users.set(id, updatedUser);
+      return updatedUser;
+    }
+    return undefined;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    return this.users.delete(id);
+  }
+
+  async getUserStats(): Promise<{ totalUsers: number; activeUsers: number; adminUsers: number }> {
+    const users = Array.from(this.users.values());
+    return {
+      totalUsers: users.length,
+      activeUsers: users.filter(u => u.isActive).length,
+      adminUsers: users.filter(u => u.role === 'admin').length
+    };
+  }
+
+  // Admin - System Configuration
+  async getSystemConfigs(category?: string): Promise<SystemConfig[]> {
+    const configs = Array.from(this.systemConfigs.values());
+    return category ? configs.filter(c => c.category === category) : configs;
+  }
+
+  async getSystemConfig(key: string): Promise<SystemConfig | undefined> {
+    return this.systemConfigs.get(key);
+  }
+
+  async createSystemConfig(insertConfig: InsertSystemConfig): Promise<SystemConfig> {
+    const config: SystemConfig = {
+      ...insertConfig,
+      id: this.currentId++,
+      description: insertConfig.description || null,
+      category: insertConfig.category || "general",
+      isPublic: insertConfig.isPublic ?? false,
+      updatedAt: new Date(),
+    };
+    this.systemConfigs.set(config.key, config);
+    return config;
+  }
+
+  async updateSystemConfig(key: string, configData: Partial<InsertSystemConfig>): Promise<SystemConfig | undefined> {
+    const config = this.systemConfigs.get(key);
+    if (config) {
+      const updatedConfig = { ...config, ...configData, updatedAt: new Date() };
+      this.systemConfigs.set(key, updatedConfig);
+      return updatedConfig;
+    }
+    return undefined;
+  }
+
+  async deleteSystemConfig(key: string): Promise<boolean> {
+    return this.systemConfigs.delete(key);
+  }
+
+  // Admin - Activity Logs
+  async getActivityLogs(filters?: { userId?: number; action?: string; resource?: string; limit?: number }): Promise<ActivityLog[]> {
+    let logs = Array.from(this.activityLogs.values());
+    
+    if (filters?.userId) {
+      logs = logs.filter(log => log.userId === filters.userId);
+    }
+    
+    if (filters?.action) {
+      logs = logs.filter(log => log.action === filters.action);
+    }
+    
+    if (filters?.resource) {
+      logs = logs.filter(log => log.resource === filters.resource);
+    }
+    
+    // Sort by creation date descending
+    logs.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    
+    if (filters?.limit) {
+      logs = logs.slice(0, filters.limit);
+    }
+    
+    return logs;
+  }
+
+  async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
+    const log: ActivityLog = {
+      ...insertLog,
+      id: this.currentId++,
+      resourceId: insertLog.resourceId || null,
+      details: insertLog.details || null,
+      ipAddress: insertLog.ipAddress || null,
+      userAgent: insertLog.userAgent || null,
+      createdAt: new Date(),
+    };
+    this.activityLogs.set(log.id, log);
+    return log;
+  }
+
+  async deleteActivityLogs(olderThanDays: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+    
+    const logs = Array.from(this.activityLogs.values());
+    const toDelete = logs.filter(log => log.createdAt < cutoffDate);
+    
+    toDelete.forEach(log => this.activityLogs.delete(log.id));
+    
+    return toDelete.length;
+  }
+
+  // Admin - System Analytics
+  async getSystemStats(): Promise<{
+    totalTransactions: number;
+    totalAccounts: number;
+    totalCategories: number;
+    totalProducts: number;
+    systemHealth: string;
+  }> {
+    const totalTransactions = this.transactions.size;
+    const totalAccounts = this.accounts.size;
+    const totalCategories = this.categories.size;
+    const totalProducts = this.products.size;
+    
+    // Simple health check based on system utilization
+    const systemHealth = totalTransactions > 0 ? "healthy" : "inactive";
+    
+    return {
+      totalTransactions,
+      totalAccounts,
+      totalCategories,
+      totalProducts,
+      systemHealth
+    };
   }
 }
 

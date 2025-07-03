@@ -3,7 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
-  insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema
+  insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
+  insertUserSchema, insertSystemConfigSchema, insertActivityLogSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -304,6 +305,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(product);
     } catch (error) {
       res.status(400).json({ message: "Invalid product data" });
+    }
+  });
+
+  // Admin - User Management
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/admin/users", async (req, res) => {
+    try {
+      const data = insertUserSchema.parse(req.body);
+      const user = await storage.createUser(data);
+      res.json(user);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user data" });
+    }
+  });
+
+  app.put("/api/admin/users/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const data = insertUserSchema.partial().parse(req.body);
+      const user = await storage.updateUser(id, data);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid user data" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteUser(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  app.get("/api/admin/users/stats", async (req, res) => {
+    try {
+      const stats = await storage.getUserStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user statistics" });
+    }
+  });
+
+  // Admin - System Configuration
+  app.get("/api/admin/system/config", async (req, res) => {
+    try {
+      const { category } = req.query;
+      const configs = await storage.getSystemConfigs(category as string);
+      res.json(configs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch system configuration" });
+    }
+  });
+
+  app.post("/api/admin/system/config", async (req, res) => {
+    try {
+      const data = insertSystemConfigSchema.parse(req.body);
+      const config = await storage.createSystemConfig(data);
+      res.json(config);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid system configuration data" });
+    }
+  });
+
+  app.put("/api/admin/system/config/:key", async (req, res) => {
+    try {
+      const key = req.params.key;
+      const data = insertSystemConfigSchema.partial().parse(req.body);
+      const config = await storage.updateSystemConfig(key, data);
+      if (!config) {
+        return res.status(404).json({ message: "Configuration not found" });
+      }
+      res.json(config);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid system configuration data" });
+    }
+  });
+
+  app.delete("/api/admin/system/config/:key", async (req, res) => {
+    try {
+      const key = req.params.key;
+      const deleted = await storage.deleteSystemConfig(key);
+      if (!deleted) {
+        return res.status(404).json({ message: "Configuration not found" });
+      }
+      res.json({ message: "Configuration deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete configuration" });
+    }
+  });
+
+  // Admin - Activity Logs
+  app.get("/api/admin/activity", async (req, res) => {
+    try {
+      const { userId, action, resource, limit } = req.query;
+      const filters = {
+        userId: userId ? parseInt(userId as string) : undefined,
+        action: action as string,
+        resource: resource as string,
+        limit: limit ? parseInt(limit as string) : undefined
+      };
+      const logs = await storage.getActivityLogs(filters);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  app.post("/api/admin/activity", async (req, res) => {
+    try {
+      const data = insertActivityLogSchema.parse(req.body);
+      const log = await storage.createActivityLog(data);
+      res.json(log);
+    } catch (error) {
+      res.status(400).json({ message: "Invalid activity log data" });
+    }
+  });
+
+  // Admin - System Analytics
+  app.get("/api/admin/system/stats", async (req, res) => {
+    try {
+      const stats = await storage.getSystemStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch system statistics" });
     }
   });
 

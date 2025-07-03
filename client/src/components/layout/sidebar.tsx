@@ -15,7 +15,8 @@ import {
   Menu,
   X,
   Package,
-  FolderTree
+  FolderTree,
+  Settings
 } from "lucide-react";
 import { useState } from "react";
 
@@ -30,6 +31,7 @@ const navigation = [
   { name: "Products", href: "/products", icon: Package },
   { name: "Reports", href: "/reports", icon: BarChart3 },
   { name: "Receipt Scanner", href: "/scanner", icon: ScanLine },
+  { name: "Admin", href: "/admin", icon: Settings },
 ];
 
 export default function Sidebar() {
