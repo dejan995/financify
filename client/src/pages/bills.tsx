@@ -74,7 +74,7 @@ export default function Bills() {
       case "paid":
         return <CheckCircle className="w-4 h-4 text-accent" />;
       case "overdue":
-        return <AlertTriangle className="w-4 h-4 text-danger" />;
+        return <AlertTriangle className="w-4 h-4 text-destructive" />;
       case "due-soon":
         return <Clock className="w-4 h-4 text-warning" />;
       default:
@@ -135,10 +135,10 @@ export default function Bills() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Overdue Amount</p>
-                  <p className="text-2xl font-bold text-danger">{formatCurrency(totalOverdue)}</p>
+                  <p className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdue)}</p>
                 </div>
                 <div className="p-3 bg-danger/10 rounded-full">
-                  <AlertTriangle className="w-6 h-6 text-danger" />
+                  <AlertTriangle className="w-6 h-6 text-destructive" />
                 </div>
               </div>
             </CardContent>
@@ -212,7 +212,7 @@ export default function Bills() {
                               {!bill.isPaid && (
                                 <div className={`text-sm ${
                                   bill.daysUntilDue < 0 
-                                    ? "text-danger" 
+                                    ? "text-destructive" 
                                     : bill.daysUntilDue <= 3 
                                       ? "text-warning" 
                                       : "text-muted-foreground"

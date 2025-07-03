@@ -87,11 +87,11 @@ export default function Budgets() {
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">Total Spent</p>
-                <p className="text-2xl font-bold text-danger">{formatCurrency(totalSpent)}</p>
+                <p className="text-2xl font-bold text-destructive">{formatCurrency(totalSpent)}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground mb-1">Remaining</p>
-                <p className={`text-2xl font-bold ${totalRemaining >= 0 ? "text-accent" : "text-danger"}`}>
+                <p className={`text-2xl font-bold ${totalRemaining >= 0 ? "text-secondary" : "text-destructive"}`}>
                   {formatCurrency(totalRemaining)}
                 </p>
               </div>
@@ -137,7 +137,7 @@ export default function Budgets() {
                       </p>
                     </div>
                     <div className={`text-right ${
-                      budget.isOverBudget ? "text-danger" : "text-muted-foreground"
+                      budget.isOverBudget ? "text-destructive" : "text-muted-foreground"
                     }`}>
                       <p className="text-sm font-medium">
                         {budget.percentage}%
@@ -152,10 +152,10 @@ export default function Budgets() {
                   
                   <p className={`text-sm ${
                     budget.isOverBudget 
-                      ? "text-danger" 
+                      ? "text-destructive" 
                       : budget.percentage > 80 
                         ? "text-warning" 
-                        : "text-accent"
+                        : "text-secondary"
                   }`}>
                     {budget.isOverBudget 
                       ? `${formatCurrency(Math.abs(budget.remaining))} over budget`

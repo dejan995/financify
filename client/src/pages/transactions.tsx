@@ -216,7 +216,7 @@ export default function Transactions() {
                         </TableCell>
                         <TableCell>{transaction.accountName}</TableCell>
                         <TableCell className={`text-right font-medium ${
-                          transaction.type === "income" ? "text-accent" : "text-danger"
+                          transaction.type === "income" ? "text-accent" : "text-destructive"
                         }`}>
                           {transaction.type === "income" ? "+" : "-"}
                           {formatCurrency(transaction.amount)}

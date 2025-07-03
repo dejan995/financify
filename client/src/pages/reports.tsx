@@ -161,13 +161,13 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Expenses</p>
-                  <p className="text-2xl font-bold text-danger">{formatCurrency(totalExpenses)}</p>
+                  <p className="text-2xl font-bold text-destructive">{formatCurrency(totalExpenses)}</p>
                   <p className="text-sm text-muted-foreground">
                     {formatCurrency(avgMonthlyExpenses)}/month avg
                   </p>
                 </div>
                 <div className="p-3 bg-danger/10 rounded-full">
-                  <TrendingDown className="w-6 h-6 text-danger" />
+                  <TrendingDown className="w-6 h-6 text-destructive" />
                 </div>
               </div>
             </CardContent>
@@ -178,7 +178,7 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Net Income</p>
-                  <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-secondary' : 'text-destructive'}`}>
                     {formatCurrency(netIncome)}
                   </p>
                   <p className="text-sm text-muted-foreground">
@@ -334,11 +334,11 @@ export default function Reports() {
                       <TableCell className="text-right text-accent">
                         {formatCurrency(month.income)}
                       </TableCell>
-                      <TableCell className="text-right text-danger">
+                      <TableCell className="text-right text-destructive">
                         {formatCurrency(month.expenses)}
                       </TableCell>
                       <TableCell className={`text-right font-medium ${
-                        month.net >= 0 ? 'text-accent' : 'text-danger'
+                        month.net >= 0 ? 'text-secondary' : 'text-destructive'
                       }`}>
                         {formatCurrency(month.net)}
                       </TableCell>

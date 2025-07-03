@@ -101,7 +101,7 @@ export default function BudgetProgress() {
               />
               <p className={`text-xs ${
                 item.isOverBudget 
-                  ? "text-danger" 
+                  ? "text-destructive" 
                   : item.percentage > 80 
                     ? "text-warning" 
                     : "text-muted-foreground"

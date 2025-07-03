@@ -60,7 +60,7 @@ export default function OverviewCards() {
       change: "+12.3% from last month",
       changeType: "negative" as const,
       icon: TrendingDown,
-      color: "text-danger",
+      color: "text-destructive",
     },
     {
       title: "Savings Rate",
@@ -82,7 +82,7 @@ export default function OverviewCards() {
                 <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
                 <p className="text-2xl font-bold text-foreground">{card.value}</p>
                 <p className={`text-sm ${
-                  card.changeType === "positive" ? "text-accent" : "text-danger"
+                  card.changeType === "positive" ? "text-secondary" : "text-destructive"
                 }`}>
                   {card.change}
                 </p>

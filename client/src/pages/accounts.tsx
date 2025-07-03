@@ -74,7 +74,7 @@ export default function Accounts() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Net Worth</p>
-                  <p className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  <p className={`text-2xl font-bold ${totalBalance >= 0 ? 'text-secondary' : 'text-destructive'}`}>
                     {formatCurrency(totalBalance)}
                   </p>
                 </div>
@@ -104,10 +104,10 @@ export default function Accounts() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Debt</p>
-                  <p className="text-2xl font-bold text-danger">{formatCurrency(negativeBalance)}</p>
+                  <p className="text-2xl font-bold text-destructive">{formatCurrency(negativeBalance)}</p>
                 </div>
                 <div className="p-3 bg-danger/10 rounded-full">
-                  <CreditCard className="w-6 h-6 text-danger" />
+                  <CreditCard className="w-6 h-6 text-destructive" />
                 </div>
               </div>
             </CardContent>
@@ -178,7 +178,7 @@ export default function Accounts() {
                           <div>
                             <p className="text-sm text-muted-foreground">Current Balance</p>
                             <p className={`text-2xl font-bold ${
-                              account.balance >= 0 ? 'text-accent' : 'text-danger'
+                              account.balance >= 0 ? 'text-secondary' : 'text-destructive'
                             }`}>
                               {formatCurrency(account.balance)}
                             </p>

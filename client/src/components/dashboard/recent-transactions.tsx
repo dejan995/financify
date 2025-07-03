@@ -87,7 +87,7 @@ export default function RecentTransactions() {
                 </div>
               </div>
               <span className={`text-sm font-medium ${
-                transaction.type === "income" ? "text-accent" : "text-danger"
+                transaction.type === "income" ? "text-accent" : "text-destructive"
               }`}>
                 {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
               </span>

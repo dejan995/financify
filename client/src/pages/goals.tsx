@@ -191,7 +191,7 @@ export default function Goals() {
                       {goal.daysUntilTarget !== null && (
                         <span className={`ml-auto ${
                           goal.daysUntilTarget < 0 
-                            ? "text-danger" 
+                            ? "text-destructive" 
                             : goal.daysUntilTarget < 30 
                               ? "text-warning" 
                               : "text-muted-foreground"
