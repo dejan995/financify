@@ -42,6 +42,9 @@ export function calculatePercentage(current: number, total: number): number {
 }
 
 export function getInitials(name: string): string {
+  if (!name || typeof name !== 'string') {
+    return "U"; // Default for undefined/null names
+  }
   return name
     .split(" ")
     .map(word => word[0])

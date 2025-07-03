@@ -475,11 +475,11 @@ export default function Admin() {
                     <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex items-center space-x-4">
                         <Avatar>
-                          <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                          <AvatarFallback>{getInitials(`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username)}</AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="flex items-center space-x-2">
-                            <p className="font-medium">{user.name}</p>
+                            <p className="font-medium">{`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username}</p>
                             <Badge className={getRoleBadgeColor(user.role)}>
                               {getRoleIcon(user.role)}
                               <span className="ml-1">{user.role}</span>
