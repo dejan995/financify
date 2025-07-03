@@ -112,7 +112,8 @@ Changelog:
 - July 03, 2025. Added Categories and Products management pages to sidebar navigation
 - July 03, 2025. Fixed comprehensive theming system with text-danger to text-destructive replacement
 - July 03, 2025. Improved color contrast: darker green in light mode, lighter red in dark mode
-- July 03, 2025. Replaced Replit authentication with custom user management system featuring bcrypt password hashing, session-based authentication, role-based access control, and comprehensive user registration/login functionality
+- July 03, 2025. Replaced Replit authentication with custom user management system featuring scrypt password hashing, session-based authentication, role-based access control, and comprehensive user registration/login functionality
+- July 03, 2025. Fixed authentication system issues - corrected password hashing consistency between admin user creation and login authentication, added confirmPassword validation to registration form
 ```
 
 ## User Preferences

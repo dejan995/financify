@@ -68,7 +68,7 @@ function UserForm({ onClose, user }: UserFormProps) {
 
   const createMutation = useMutation({
     mutationFn: (data: UserFormData) => {
-      return apiRequest("POST", `/api/admin/users`, { ...data, password: "defaultpassword123" });
+      return apiRequest("POST", `/api/admin/users`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
