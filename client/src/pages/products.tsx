@@ -46,21 +46,26 @@ export default function Products() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Products</h1>
-          <p className="text-muted-foreground">
-            Manage your product database for receipt scanning
-          </p>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800">Products</h2>
+            <p className="text-muted-foreground">
+              Manage your product database for receipt scanning
+            </p>
+          </div>
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Product
+          </Button>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Product
-        </Button>
-      </div>
+      </header>
 
-      {/* Search Bar */}
+      {/* Content */}
+      <div className="flex-1 p-6 overflow-y-auto space-y-6">
+        {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
         <Input
@@ -238,6 +243,7 @@ export default function Products() {
           product={selectedProduct}
         />
       )}
+      </div>
     </div>
   );
 }

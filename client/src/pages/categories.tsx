@@ -40,21 +40,26 @@ export default function Categories() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-          <p className="text-muted-foreground">
-            Organize your transactions with custom categories
-          </p>
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-800">Categories</h2>
+            <p className="text-muted-foreground">
+              Organize your transactions with custom categories
+            </p>
+          </div>
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Category
+          </Button>
         </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Category
-        </Button>
-      </div>
+      </header>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      {/* Content */}
+      <div className="flex-1 p-6 overflow-y-auto space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
         {/* Expense Categories */}
         <Card>
           <CardHeader>
@@ -170,9 +175,9 @@ export default function Categories() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      {/* Overview Stats */}
+        {/* Overview Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -221,6 +226,7 @@ export default function Categories() {
           category={selectedCategory}
         />
       )}
+      </div>
     </div>
   );
 }
