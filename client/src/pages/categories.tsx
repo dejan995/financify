@@ -42,10 +42,10 @@ export default function Categories() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="flex items-center justify-between px-6 py-4">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800">Categories</h2>
+            <h2 className="text-2xl font-semibold text-foreground">Categories</h2>
           </div>
           <Button onClick={() => setIsFormOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
