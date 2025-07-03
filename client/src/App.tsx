@@ -52,7 +52,7 @@ function AuthenticatedApp() {
           <Route path="/products" component={Products} />
           <Route path="/reports" component={Reports} />
           <Route path="/scanner" component={Scanner} />
-          {user?.role === "admin" && <Route path="/admin" component={Admin} />}
+          {/* Admin route removed - Replit Auth doesn't support roles */}
           <Route component={NotFound} />
         </Switch>
       </main>
