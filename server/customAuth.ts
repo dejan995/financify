@@ -175,7 +175,7 @@ export function setupAuth(app: Express) {
   });
 
   // Authentication routes
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/auth/register", async (req, res, next) => {
     try {
       const { username, email, password, firstName, lastName } = req.body;
 
@@ -235,16 +235,31 @@ export function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    if (req.user) {
-      const { passwordHash, ...userWithoutPassword } = req.user;
-      res.json(userWithoutPassword);
-    } else {
-      res.status(401).json({ message: "Login failed" });
-    }
+  app.post("/api/auth/login", (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Authentication error:", err);
+        return res.status(500).json({ message: "Authentication error" });
+      }
+      
+      if (!user) {
+        console.log("Login failed:", info?.message || "Invalid credentials");
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      
+      req.login(user, (err) => {
+        if (err) {
+          console.error("Session error:", err);
+          return res.status(500).json({ message: "Session error" });
+        }
+        
+        const { passwordHash, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+      });
+    })(req, res, next);
   });
 
-  app.post("/api/logout", (req, res, next) => {
+  app.post("/api/auth/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
       res.json({ message: "Logged out successfully" });
