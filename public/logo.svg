@@ -1,0 +1,12 @@
+<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoIconGradient" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+  <path d="M24.5 12V36" stroke="url(#logoIconGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M31 18C31 14.6863 28.0899 12 24.5 12C20.9101 12 18 14.6863 18 18C18 21.3137 20.9101 24 24.5 24C28.0899 24 31 26.6863 31 30C31 33.3137 28.0899 36 24.5 36C20.9101 36 18 33.3137 18 30" stroke="url(#logoIconGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8.68629 39.3137C2.97221 33.6003 2.97221 24.3997 8.68629 18.6863" stroke="url(#logoIconGradient)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M39.3137 8.68629C45.0278 14.3997 45.0278 23.6003 39.3137 29.3137" stroke="url(#logoIconGradient)" stroke-width="5" stroke-linecap="round"/>
+</svg>
