@@ -52,9 +52,6 @@ export default function Products() {
         <div className="flex items-center justify-between px-6 py-4">
           <div>
             <h2 className="text-2xl font-semibold text-gray-800">Products</h2>
-            <p className="text-muted-foreground">
-              Manage your product database for receipt scanning
-            </p>
           </div>
           <Button onClick={() => setIsFormOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
