@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin } from "./customAuth";
+import bcrypt from "bcryptjs";
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
@@ -381,6 +382,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching category spending:", error);
       res.status(500).json({ message: "Failed to fetch category spending" });
+    }
+  });
+
+  // Admin routes
+  app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      // Remove password hashes from response
+      const safeUsers = users.map(user => {
+        const { passwordHash, ...safeUser } = user;
+        return safeUser;
+      });
+      res.json(safeUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/admin/users", requireAdmin, async (req: any, res) => {
+    try {
+      const { password, ...userData } = req.body;
+      
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password || "defaultpassword123", 12);
+      
+      // Create a UpsertUser object with all required fields
+      const userToCreate: any = {
+        username: userData.username,
+        email: userData.email,
+        passwordHash: hashedPassword,
+        firstName: userData.firstName || null,
+        lastName: userData.lastName || null,
+        profileImageUrl: userData.profileImageUrl || null,
+        role: userData.role || "user",
+        isActive: userData.isActive !== undefined ? userData.isActive : true,
+        isEmailVerified: true, // Admin created users are auto-verified
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        lastLoginAt: null
+      };
+      
+      const user = await storage.createUser(userToCreate);
+      // Remove password hash from response
+      const { passwordHash, ...safeUser } = user;
+      res.status(201).json(safeUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.put("/api/admin/users/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates = insertUserSchema.partial().parse(req.body);
+      const user = await storage.updateUser(id, updates);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      // Remove password hash from response
+      const { passwordHash, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteUser(id);
+      if (!deleted) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  app.get("/api/admin/users/stats", requireAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getUserStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      res.status(500).json({ message: "Failed to fetch user statistics" });
+    }
+  });
+
+  app.get("/api/admin/system/stats", requireAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getSystemStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching system stats:", error);
+      res.status(500).json({ message: "Failed to fetch system statistics" });
     }
   });
 
