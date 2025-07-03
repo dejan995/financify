@@ -65,7 +65,7 @@ export default function Sidebar() {
           <img 
             src="/logo.svg" 
             alt="FinanceTracker Pro" 
-            className="h-10 w-auto object-contain"
+            className="h-11 w-auto object-contain"
           />
         </div>
         
