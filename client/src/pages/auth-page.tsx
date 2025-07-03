@@ -31,8 +31,9 @@ export default function AuthPage() {
       username: "",
       email: "",
       password: "",
-      firstName: "",
-      lastName: "",
+      confirmPassword: "",
+      firstName: null,
+      lastName: null,
     },
   });
 
@@ -163,7 +164,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>First Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="John" {...field} />
+                                <Input placeholder="John" {...field} value={field.value || ""} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -176,7 +177,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Last Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="Doe" {...field} />
+                                <Input placeholder="Doe" {...field} value={field.value || ""} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -217,6 +218,19 @@ export default function AuthPage() {
                             <FormLabel>Password</FormLabel>
                             <FormControl>
                               <Input type="password" placeholder="Create a password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Confirm Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="Confirm your password" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

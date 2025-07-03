@@ -1,8 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, requireAuth, requireAdmin } from "./customAuth";
-import bcrypt from "bcryptjs";
+import { setupAuth, requireAuth, requireAdmin, AuthService } from "./customAuth";
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
@@ -405,8 +404,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { password, ...userData } = req.body;
       
-      // Hash the password
-      const hashedPassword = await bcrypt.hash(password || "defaultpassword123", 12);
+      // Hash the password using the same method as registration
+      const hashedPassword = await AuthService.hashPassword(password || "defaultpassword123");
       
       // Create a UpsertUser object with all required fields
       const userToCreate: any = {
