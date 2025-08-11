@@ -210,8 +210,17 @@ export class SQLiteStorage implements IStorage {
 
   async createUser(user: UpsertUser): Promise<User> {
     const now = new Date().toISOString();
+    // Convert all Date objects to strings for SQLite compatibility
+    const sanitizedUser = { ...user };
+    if (sanitizedUser.lastLoginAt instanceof Date) {
+      sanitizedUser.lastLoginAt = sanitizedUser.lastLoginAt.toISOString();
+    }
+    if (sanitizedUser.passwordResetExpires instanceof Date) {
+      sanitizedUser.passwordResetExpires = sanitizedUser.passwordResetExpires.toISOString();
+    }
+    
     const result = await this.db.insert(schema.users).values({
-      ...user,
+      ...sanitizedUser,
       createdAt: now,
       updatedAt: now,
     }).returning();
@@ -219,8 +228,17 @@ export class SQLiteStorage implements IStorage {
   }
 
   async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined> {
+    // Convert all Date objects to strings for SQLite compatibility
+    const sanitizedUpdates = { ...updates };
+    if (sanitizedUpdates.lastLoginAt instanceof Date) {
+      sanitizedUpdates.lastLoginAt = sanitizedUpdates.lastLoginAt.toISOString();
+    }
+    if (sanitizedUpdates.passwordResetExpires instanceof Date) {
+      sanitizedUpdates.passwordResetExpires = sanitizedUpdates.passwordResetExpires.toISOString();
+    }
+    
     const result = await this.db.update(schema.users)
-      .set({ ...updates, updatedAt: new Date().toISOString() })
+      .set({ ...sanitizedUpdates, updatedAt: new Date().toISOString() })
       .where(eq(schema.users.id, id))
       .returning();
     return result[0];
