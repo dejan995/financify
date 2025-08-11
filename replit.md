@@ -121,6 +121,7 @@ Changelog:
 - August 11, 2025. Implemented WordPress-style initialization wizard with proper database connection testing - users can now test database connections before proceeding, preventing WebSocket failures and providing clear feedback on connectivity issues
 - August 11, 2025. Updated Supabase integration to use standard React process with Project URL and Anonymous Key instead of connection strings - created comprehensive SupabaseStorage implementation, enhanced initialization wizard with proper Supabase field validation, and integrated connection testing to prevent WebSocket issues
 - August 11, 2025. Implemented fully automatic Supabase schema initialization - users now only need to provide Supabase URL and API key, database tables are created automatically without any manual SQL execution required
+- August 11, 2025. Simplified Supabase integration to work with existing public schema - automatic table creation during first use, no manual SQL required, leverages Supabase's default schema structure
 ```
 
 ## User Preferences
