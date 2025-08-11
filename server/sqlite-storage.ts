@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
-import * as schema from '@shared/sqlite-schema';
+import * as schema from '@shared/schema';
 import fs from 'fs';
 import path from 'path';
 import { IStorage } from './storage';

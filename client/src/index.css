@@ -98,25 +98,5 @@
 }
 
 @layer utilities {
-  .text-success {
-    color: hsl(160, 84%, 39%);
-  }
-  
-  .text-warning {
-    color: hsl(36, 93%, 47%);
-  }
-  
-
-  
-  .bg-success {
-    background-color: hsl(160, 84%, 39%);
-  }
-  
-  .bg-warning {
-    background-color: hsl(36, 93%, 47%);
-  }
-  
-  .bg-danger {
-    background-color: hsl(0, 84%, 60%);
-  }
+  /* Utility classes can be added here as needed */
 }

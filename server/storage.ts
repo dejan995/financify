@@ -705,7 +705,7 @@ export class MemStorage implements IStorage {
 
 import { DatabaseStorage } from './database-storage';
 import { SQLiteStorage } from './sqlite-storage';
-import { databaseManager } from './database-manager';
+// Database manager removed for system stability
 import { initializationManager } from './initialization-manager';
 import { existsSync } from 'fs';
 
