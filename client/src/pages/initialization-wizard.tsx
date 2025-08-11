@@ -473,6 +473,65 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
 
                 {renderProviderFields()}
 
+                {/* Connection Test Section for external databases */}
+                {selectedProvider !== 'sqlite' && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">Test Database Connection</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Verify your database credentials before proceeding
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleTestConnection}
+                        disabled={testConnectionMutation.isPending}
+                      >
+                        {testConnectionMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <Database className="w-4 h-4 mr-2" />
+                            Test Connection
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Connection Test Result */}
+                    {hasTestedConnection && connectionTestResult && (
+                      <div className={`p-4 rounded-lg border ${
+                        connectionTestResult.success 
+                          ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                          : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+                      }`}>
+                        <div className="flex items-center space-x-2">
+                          {connectionTestResult.success ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <AlertTriangle className="w-5 h-5 text-red-600" />
+                          )}
+                          <span className={`font-medium ${
+                            connectionTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+                          }`}>
+                            {connectionTestResult.success ? 'Connection Successful' : 'Connection Failed'}
+                          </span>
+                        </div>
+                        {connectionTestResult.error && (
+                          <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                            {connectionTestResult.error}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <Separator />
 
                 <div className="flex space-x-4">
