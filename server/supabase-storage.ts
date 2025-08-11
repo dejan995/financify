@@ -1,27 +1,17 @@
-import { SupabaseClient } from '@supabase/supabase-js';
-import { initializeSupabaseClient } from './supabase-client';
-import { IStorage } from './storage';
+import { SupabaseClient } from "@supabase/supabase-js";
+import { IStorage } from "./storage";
+import { initializeSupabaseClient } from "./supabase-client";
 import {
-  User,
-  Account,
-  Category,
-  Transaction,
-  Budget,
-  Goal,
-  Bill,
-  Product,
-  SystemConfig,
-  ActivityLog,
-  UpsertUser,
-  InsertAccount,
-  InsertCategory,
-  InsertTransaction,
-  InsertBudget,
-  InsertGoal,
-  InsertBill,
-  InsertProduct,
-  InsertSystemConfig,
-  InsertActivityLog,
+  User, NewUser, SelectUser,
+  Account, NewAccount, SelectAccount,
+  Category, NewCategory, SelectCategory,
+  Transaction, NewTransaction, SelectTransaction,
+  Budget, NewBudget, SelectBudget,
+  Goal, NewGoal, SelectGoal,
+  Bill, NewBill, SelectBill,
+  Product, NewProduct, SelectProduct,
+  ActivityLog, NewActivityLog, SelectActivityLog,
+  SystemConfig, NewSystemConfig, SelectSystemConfig
 } from "@shared/schema";
 
 export class SupabaseStorage implements IStorage {
@@ -48,220 +38,25 @@ export class SupabaseStorage implements IStorage {
   }
 
   private async createSchema(): Promise<void> {
-    // Create all required tables using Supabase RPC calls
-    try {
-      // Execute the complete schema creation SQL
-      const schemaSQL = `
-        -- Users table
-        CREATE TABLE IF NOT EXISTS users (
-          id SERIAL PRIMARY KEY,
-          username VARCHAR(50) UNIQUE NOT NULL,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          password_hash VARCHAR(255) NOT NULL,
-          first_name VARCHAR(100),
-          last_name VARCHAR(100),
-          profile_image_url TEXT,
-          role VARCHAR(20) DEFAULT 'user',
-          is_active BOOLEAN DEFAULT true,
-          is_email_verified BOOLEAN DEFAULT false,
-          email_verification_token VARCHAR(255),
-          password_reset_token VARCHAR(255),
-          password_reset_expires TIMESTAMP,
-          last_login_at TIMESTAMP,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Accounts table
-        CREATE TABLE IF NOT EXISTS accounts (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          name VARCHAR(100) NOT NULL,
-          type VARCHAR(20) NOT NULL CHECK (type IN ('checking', 'savings', 'credit', 'investment', 'loan', 'other')),
-          balance DECIMAL(15, 2) DEFAULT 0.00,
-          currency VARCHAR(3) DEFAULT 'USD',
-          is_active BOOLEAN DEFAULT true,
-          institution VARCHAR(100),
-          account_number VARCHAR(50),
-          routing_number VARCHAR(20),
-          notes TEXT,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Categories table
-        CREATE TABLE IF NOT EXISTS categories (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          name VARCHAR(100) NOT NULL,
-          type VARCHAR(10) NOT NULL CHECK (type IN ('income', 'expense')),
-          color VARCHAR(7) DEFAULT '#6366f1',
-          icon VARCHAR(50),
-          parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-          is_active BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Transactions table
-        CREATE TABLE IF NOT EXISTS transactions (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-          category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-          amount DECIMAL(15, 2) NOT NULL,
-          description TEXT,
-          date DATE NOT NULL,
-          type VARCHAR(10) NOT NULL CHECK (type IN ('income', 'expense', 'transfer')),
-          payee VARCHAR(255),
-          reference_number VARCHAR(100),
-          notes TEXT,
-          tags TEXT[],
-          is_recurring BOOLEAN DEFAULT false,
-          recurring_interval VARCHAR(20),
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Budgets table
-        CREATE TABLE IF NOT EXISTS budgets (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
-          name VARCHAR(100) NOT NULL,
-          amount DECIMAL(15, 2) NOT NULL,
-          period VARCHAR(20) NOT NULL CHECK (period IN ('weekly', 'monthly', 'quarterly', 'yearly')),
-          start_date DATE NOT NULL,
-          end_date DATE,
-          is_active BOOLEAN DEFAULT true,
-          alert_threshold DECIMAL(5, 2) DEFAULT 80.00,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Goals table
-        CREATE TABLE IF NOT EXISTS goals (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          name VARCHAR(100) NOT NULL,
-          description TEXT,
-          target_amount DECIMAL(15, 2) NOT NULL,
-          current_amount DECIMAL(15, 2) DEFAULT 0.00,
-          target_date DATE,
-          category VARCHAR(50),
-          priority VARCHAR(10) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high')),
-          is_achieved BOOLEAN DEFAULT false,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Bills table
-        CREATE TABLE IF NOT EXISTS bills (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL,
-          category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-          name VARCHAR(100) NOT NULL,
-          amount DECIMAL(15, 2) NOT NULL,
-          due_date DATE NOT NULL,
-          frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('weekly', 'monthly', 'quarterly', 'yearly')),
-          payee VARCHAR(255),
-          notes TEXT,
-          is_autopay BOOLEAN DEFAULT false,
-          reminder_days INTEGER DEFAULT 3,
-          is_active BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Products table
-        CREATE TABLE IF NOT EXISTS products (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          name VARCHAR(255) NOT NULL,
-          brand VARCHAR(100),
-          category VARCHAR(100),
-          barcode VARCHAR(50),
-          price DECIMAL(10, 2),
-          currency VARCHAR(3) DEFAULT 'USD',
-          store VARCHAR(100),
-          description TEXT,
-          image_url TEXT,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- System Config table
-        CREATE TABLE IF NOT EXISTS system_config (
-          id SERIAL PRIMARY KEY,
-          key VARCHAR(100) UNIQUE NOT NULL,
-          value TEXT,
-          description TEXT,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        );
-
-        -- Activity Logs table
-        CREATE TABLE IF NOT EXISTS activity_logs (
-          id SERIAL PRIMARY KEY,
-          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          action VARCHAR(50) NOT NULL,
-          resource VARCHAR(100),
-          resource_id INTEGER,
-          timestamp TIMESTAMP DEFAULT NOW(),
-          details TEXT,
-          ip_address INET,
-          user_agent TEXT
-        );
-      `;
-
-      // Since Supabase doesn't allow arbitrary SQL execution via client,
-      // we'll use the REST API to execute schema creation
-      await this.executeSchemaViaRestAPI(schemaSQL);
-    } catch (error) {
-      console.error('Schema creation failed:', error);
-      throw new Error('Failed to create database schema automatically. Please ensure your Supabase project has the necessary permissions.');
-    }
-  }
-
-  private async executeSchemaViaRestAPI(sql: string): Promise<void> {
-    // Get Supabase project details from the client
-    const supabaseUrl = this.client.supabaseUrl;
-    const supabaseKey = this.client.supabaseKey;
+    // For Supabase, we need the user to create the schema manually
+    // since the JavaScript client doesn't allow arbitrary SQL execution
+    console.log('Supabase requires manual schema creation');
     
-    try {
-      // Use Supabase's REST API to execute SQL
-      const response = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseKey}`,
-          'apikey': supabaseKey,
-        },
-        body: JSON.stringify({ sql })
-      });
-
-      if (!response.ok) {
-        // If that doesn't work, try the database API endpoint
-        const dbResponse = await fetch(`${supabaseUrl}/database/execute`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`,
-            'apikey': supabaseKey,
-          },
-          body: JSON.stringify({ query: sql })
-        });
-
-        if (!dbResponse.ok) {
-          throw new Error('Unable to execute schema creation automatically. Please ensure your Supabase project allows SQL execution via API.');
-        }
-      }
-    } catch (error) {
-      console.error('Automatic schema creation failed:', error);
-      // For now, we'll just skip schema creation and let individual operations handle table creation
-      console.log('Proceeding without automatic schema creation - tables will be created as needed');
-    }
+    const instructions = [
+      "SUPABASE SETUP REQUIRED:",
+      "",
+      "The database tables don't exist yet. Please follow these steps:",
+      "",
+      "1. Open your Supabase project dashboard",
+      "2. Go to the SQL Editor tab", 
+      "3. Copy and paste the SQL schema from: server/supabase-schema.sql",
+      "4. Click 'Run' to create all the required tables",
+      "5. Return here and try the setup again",
+      "",
+      "The schema file contains all the necessary tables for the Personal Finance Tracker application."
+    ].join('\n');
+    
+    throw new Error(instructions);
   }
 
   // User operations
@@ -274,612 +69,485 @@ export class SupabaseStorage implements IStorage {
     return count || 0;
   }
 
-  async getUser(id: number): Promise<User | undefined> {
+  async createUser(userData: NewUser): Promise<SelectUser> {
     const { data, error } = await this.client
       .from('users')
-      .select('*')
-      .eq('id', id)
+      .insert(userData)
+      .select()
       .single();
     
-    if (error) return undefined;
-    return data as User;
+    if (error) throw error;
+    return data;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
+  async getUserByUsername(username: string): Promise<SelectUser | null> {
     const { data, error } = await this.client
       .from('users')
       .select('*')
       .eq('username', username)
       .single();
     
-    if (error) return undefined;
-    return data as User;
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data;
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
+  async getUserByEmail(email: string): Promise<SelectUser | null> {
     const { data, error } = await this.client
       .from('users')
       .select('*')
       .eq('email', email)
       .single();
     
-    if (error) return undefined;
-    return data as User;
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data;
   }
 
-  async createUser(user: UpsertUser): Promise<User> {
+  async getUserById(id: number): Promise<SelectUser | null> {
     const { data, error } = await this.client
       .from('users')
-      .insert([{
-        ...user,
-        createdAt: new Date()
-      }])
-      .select()
+      .select('*')
+      .eq('id', id)
       .single();
     
-    if (error) throw error;
-    return data as User;
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data;
   }
 
-  async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined> {
+  async updateUser(id: number, userData: Partial<NewUser>): Promise<SelectUser> {
     const { data, error } = await this.client
       .from('users')
-      .update(updates)
+      .update(userData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as User;
+    if (error) throw error;
+    return data;
   }
 
-  async getAccountBalance(userId: number): Promise<{ balance: number }> {
-    const { data, error } = await this.client
-      .from('accounts')
-      .select('balance')
-      .eq('userId', userId);
+  async deleteUser(id: number): Promise<void> {
+    const { error } = await this.client
+      .from('users')
+      .delete()
+      .eq('id', id);
     
     if (error) throw error;
+  }
+
+  async getUsers(): Promise<SelectUser[]> {
+    const { data, error } = await this.client
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
     
-    const balance = data?.reduce((sum, account) => sum + parseFloat(account.balance || '0'), 0) || 0;
-    return { balance };
+    if (error) throw error;
+    return data || [];
   }
 
   // Account operations
-  async getAccounts(userId: number): Promise<Account[]> {
+  async getAccounts(userId: number): Promise<SelectAccount[]> {
     const { data, error } = await this.client
       .from('accounts')
       .select('*')
-      .eq('userId', userId);
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data as Account[];
+    return data || [];
   }
 
-  async getAccount(id: number): Promise<Account | undefined> {
+  async createAccount(accountData: NewAccount): Promise<SelectAccount> {
     const { data, error } = await this.client
       .from('accounts')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) return undefined;
-    return data as Account;
-  }
-
-  async createAccount(account: InsertAccount): Promise<Account> {
-    const { data, error } = await this.client
-      .from('accounts')
-      .insert([{
-        ...account,
-        createdAt: new Date()
-      }])
+      .insert(accountData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Account;
+    return data;
   }
 
-  async updateAccount(id: number, account: Partial<InsertAccount>): Promise<Account | undefined> {
+  async updateAccount(id: number, accountData: Partial<NewAccount>): Promise<SelectAccount> {
     const { data, error } = await this.client
       .from('accounts')
-      .update(account)
+      .update(accountData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Account;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteAccount(id: number): Promise<boolean> {
+  async deleteAccount(id: number): Promise<void> {
     const { error } = await this.client
       .from('accounts')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
-  // Categories operations
-  async getCategories(userId: number): Promise<Category[]> {
+  async getAccountBalance(userId: number): Promise<number> {
     const { data, error } = await this.client
-      .from('categories')
-      .select('*')
-      .eq('userId', userId);
+      .from('accounts')
+      .select('balance')
+      .eq('user_id', userId)
+      .eq('is_active', true);
     
     if (error) throw error;
-    return data as Category[];
+    
+    return (data || []).reduce((total, account) => total + Number(account.balance), 0);
   }
 
-  async getCategory(id: number): Promise<Category | undefined> {
+  // Category operations
+  async getCategories(userId: number): Promise<SelectCategory[]> {
     const { data, error } = await this.client
       .from('categories')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('user_id', userId)
+      .order('name');
     
-    if (error) return undefined;
-    return data as Category;
+    if (error) throw error;
+    return data || [];
   }
 
-  async createCategory(category: InsertCategory): Promise<Category> {
+  async createCategory(categoryData: NewCategory): Promise<SelectCategory> {
     const { data, error } = await this.client
       .from('categories')
-      .insert([{
-        ...category,
-        createdAt: new Date()
-      }])
+      .insert(categoryData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Category;
+    return data;
   }
 
-  async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined> {
+  async updateCategory(id: number, categoryData: Partial<NewCategory>): Promise<SelectCategory> {
     const { data, error } = await this.client
       .from('categories')
-      .update(category)
+      .update(categoryData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Category;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteCategory(id: number): Promise<boolean> {
+  async deleteCategory(id: number): Promise<void> {
     const { error } = await this.client
       .from('categories')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
-  // Transactions operations
-  async getTransactions(userId: number, filters?: {
-    accountId?: number;
-    categoryId?: number;
-    startDate?: string;
-    endDate?: string;
-    type?: string;
-  }): Promise<Transaction[]> {
+  // Transaction operations
+  async getTransactions(userId: number, limit?: number, offset?: number): Promise<SelectTransaction[]> {
     let query = this.client
       .from('transactions')
-      .select('*')
-      .eq('userId', userId);
+      .select(`
+        *,
+        account:accounts(name, type),
+        category:categories(name, color)
+      `)
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
 
-    if (filters?.accountId) {
-      query = query.eq('accountId', filters.accountId);
-    }
-    if (filters?.categoryId) {
-      query = query.eq('categoryId', filters.categoryId);
-    }
-    if (filters?.startDate) {
-      query = query.gte('date', filters.startDate);
-    }
-    if (filters?.endDate) {
-      query = query.lte('date', filters.endDate);
-    }
-    if (filters?.type) {
-      query = query.eq('type', filters.type);
-    }
+    if (limit) query = query.limit(limit);
+    if (offset) query = query.range(offset, offset + (limit || 50) - 1);
 
     const { data, error } = await query;
     
     if (error) throw error;
-    return data as Transaction[];
+    return data || [];
   }
 
-  async getTransaction(id: number): Promise<Transaction | undefined> {
+  async createTransaction(transactionData: NewTransaction): Promise<SelectTransaction> {
     const { data, error } = await this.client
       .from('transactions')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) return undefined;
-    return data as Transaction;
-  }
-
-  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const { data, error } = await this.client
-      .from('transactions')
-      .insert([{
-        ...transaction,
-        createdAt: new Date()
-      }])
+      .insert(transactionData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Transaction;
+    return data;
   }
 
-  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+  async updateTransaction(id: number, transactionData: Partial<NewTransaction>): Promise<SelectTransaction> {
     const { data, error } = await this.client
       .from('transactions')
-      .update(transaction)
+      .update(transactionData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Transaction;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteTransaction(id: number): Promise<boolean> {
+  async deleteTransaction(id: number): Promise<void> {
     const { error } = await this.client
       .from('transactions')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
   // Budget operations
-  async getBudgets(userId: number): Promise<Budget[]> {
+  async getBudgets(userId: number): Promise<SelectBudget[]> {
     const { data, error } = await this.client
       .from('budgets')
-      .select('*')
-      .eq('userId', userId);
+      .select(`
+        *,
+        category:categories(name, color)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data as Budget[];
+    return data || [];
   }
 
-  async getBudget(id: number): Promise<Budget | undefined> {
+  async createBudget(budgetData: NewBudget): Promise<SelectBudget> {
     const { data, error } = await this.client
       .from('budgets')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) return undefined;
-    return data as Budget;
-  }
-
-  async createBudget(budget: InsertBudget): Promise<Budget> {
-    const { data, error } = await this.client
-      .from('budgets')
-      .insert([{
-        ...budget,
-        createdAt: new Date()
-      }])
+      .insert(budgetData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Budget;
+    return data;
   }
 
-  async updateBudget(id: number, budget: Partial<InsertBudget>): Promise<Budget | undefined> {
+  async updateBudget(id: number, budgetData: Partial<NewBudget>): Promise<SelectBudget> {
     const { data, error } = await this.client
       .from('budgets')
-      .update(budget)
+      .update(budgetData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Budget;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteBudget(id: number): Promise<boolean> {
+  async deleteBudget(id: number): Promise<void> {
     const { error } = await this.client
       .from('budgets')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
   // Goal operations
-  async getGoals(userId: number): Promise<Goal[]> {
+  async getGoals(userId: number): Promise<SelectGoal[]> {
     const { data, error } = await this.client
       .from('goals')
       .select('*')
-      .eq('userId', userId);
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     
     if (error) throw error;
-    return data as Goal[];
+    return data || [];
   }
 
-  async getGoal(id: number): Promise<Goal | undefined> {
+  async createGoal(goalData: NewGoal): Promise<SelectGoal> {
     const { data, error } = await this.client
       .from('goals')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) return undefined;
-    return data as Goal;
-  }
-
-  async createGoal(goal: InsertGoal): Promise<Goal> {
-    const { data, error } = await this.client
-      .from('goals')
-      .insert([{
-        ...goal,
-        createdAt: new Date()
-      }])
+      .insert(goalData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Goal;
+    return data;
   }
 
-  async updateGoal(id: number, goal: Partial<InsertGoal>): Promise<Goal | undefined> {
+  async updateGoal(id: number, goalData: Partial<NewGoal>): Promise<SelectGoal> {
     const { data, error } = await this.client
       .from('goals')
-      .update(goal)
+      .update(goalData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Goal;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteGoal(id: number): Promise<boolean> {
+  async deleteGoal(id: number): Promise<void> {
     const { error } = await this.client
       .from('goals')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
   // Bill operations
-  async getBills(userId: number): Promise<Bill[]> {
+  async getBills(userId: number): Promise<SelectBill[]> {
     const { data, error } = await this.client
       .from('bills')
-      .select('*')
-      .eq('userId', userId);
+      .select(`
+        *,
+        account:accounts(name),
+        category:categories(name, color)
+      `)
+      .eq('user_id', userId)
+      .order('due_date');
     
     if (error) throw error;
-    return data as Bill[];
+    return data || [];
   }
 
-  async getBill(id: number): Promise<Bill | undefined> {
+  async createBill(billData: NewBill): Promise<SelectBill> {
     const { data, error } = await this.client
       .from('bills')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) return undefined;
-    return data as Bill;
-  }
-
-  async createBill(bill: InsertBill): Promise<Bill> {
-    const { data, error } = await this.client
-      .from('bills')
-      .insert([{
-        ...bill,
-        createdAt: new Date()
-      }])
+      .insert(billData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Bill;
+    return data;
   }
 
-  async updateBill(id: number, bill: Partial<InsertBill>): Promise<Bill | undefined> {
+  async updateBill(id: number, billData: Partial<NewBill>): Promise<SelectBill> {
     const { data, error } = await this.client
       .from('bills')
-      .update(bill)
+      .update(billData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Bill;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteBill(id: number): Promise<boolean> {
+  async deleteBill(id: number): Promise<void> {
     const { error } = await this.client
       .from('bills')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
   // Product operations
-  async getProducts(): Promise<Product[]> {
-    const { data, error } = await this.client
-      .from('products')
-      .select('*');
-    
-    if (error) throw error;
-    return data as Product[];
-  }
-
-  async getProduct(id: number): Promise<Product | undefined> {
+  async getProducts(userId: number): Promise<SelectProduct[]> {
     const { data, error } = await this.client
       .from('products')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     
-    if (error) return undefined;
-    return data as Product;
+    if (error) throw error;
+    return data || [];
   }
 
-  async createProduct(product: InsertProduct): Promise<Product> {
+  async createProduct(productData: NewProduct): Promise<SelectProduct> {
     const { data, error } = await this.client
       .from('products')
-      .insert([{
-        ...product,
-        createdAt: new Date()
-      }])
+      .insert(productData)
       .select()
       .single();
     
     if (error) throw error;
-    return data as Product;
+    return data;
   }
 
-  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+  async updateProduct(id: number, productData: Partial<NewProduct>): Promise<SelectProduct> {
     const { data, error } = await this.client
       .from('products')
-      .update(product)
+      .update(productData)
       .eq('id', id)
       .select()
       .single();
     
-    if (error) return undefined;
-    return data as Product;
+    if (error) throw error;
+    return data;
   }
 
-  async deleteProduct(id: number): Promise<boolean> {
+  async deleteProduct(id: number): Promise<void> {
     const { error } = await this.client
       .from('products')
       .delete()
       .eq('id', id);
     
-    return !error;
+    if (error) throw error;
   }
 
-  // System operations
-  async getSystemConfigs(): Promise<SystemConfig[]> {
-    const { data, error } = await this.client
-      .from('systemConfigs')
-      .select('*');
+  // Activity Log operations
+  async getActivityLogs(userId: number, limit?: number): Promise<SelectActivityLog[]> {
+    let query = this.client
+      .from('activity_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('timestamp', { ascending: false });
+
+    if (limit) query = query.limit(limit);
+
+    const { data, error } = await query;
     
     if (error) throw error;
-    return data as SystemConfig[];
+    return data || [];
   }
 
-  async getSystemConfig(key: string): Promise<SystemConfig | undefined> {
+  async createActivityLog(logData: NewActivityLog): Promise<SelectActivityLog> {
     const { data, error } = await this.client
-      .from('systemConfigs')
+      .from('activity_logs')
+      .insert(logData)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+
+  // System Config operations
+  async getSystemConfig(key: string): Promise<SelectSystemConfig | null> {
+    const { data, error } = await this.client
+      .from('system_config')
       .select('*')
       .eq('key', key)
       .single();
     
-    if (error) return undefined;
-    return data as SystemConfig;
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
+    return data;
   }
 
-  async setSystemConfig(config: InsertSystemConfig): Promise<SystemConfig> {
+  async setSystemConfig(configData: NewSystemConfig): Promise<SelectSystemConfig> {
     const { data, error } = await this.client
-      .from('systemConfigs')
-      .upsert([{
-        ...config,
-        updatedAt: new Date()
-      }])
+      .from('system_config')
+      .upsert(configData, { onConflict: 'key' })
       .select()
       .single();
     
     if (error) throw error;
-    return data as SystemConfig;
+    return data;
   }
 
-  async deleteSystemConfig(key: string): Promise<boolean> {
+  async deleteSystemConfig(key: string): Promise<void> {
     const { error } = await this.client
-      .from('systemConfigs')
+      .from('system_config')
       .delete()
       .eq('key', key);
     
-    return !error;
-  }
-
-  // Activity log operations
-  async getActivityLogs(filters?: {
-    userId?: number;
-    action?: string;
-    resource?: string;
-    limit?: number;
-  }): Promise<ActivityLog[]> {
-    let query = this.client.from('activityLogs').select('*');
-    
-    if (filters?.userId) {
-      query = query.eq('userId', filters.userId);
-    }
-    if (filters?.action) {
-      query = query.eq('action', filters.action);
-    }
-    if (filters?.resource) {
-      query = query.eq('resource', filters.resource);
-    }
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-    
-    const { data, error } = await query.order('timestamp', { ascending: false });
-    
     if (error) throw error;
-    return data as ActivityLog[];
-  }
-
-  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
-    const { data, error } = await this.client
-      .from('activityLogs')
-      .insert([{
-        ...log,
-        timestamp: new Date()
-      }])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data as ActivityLog;
-  }
-
-  async deleteActivityLogs(olderThanDays: number): Promise<number> {
-    const beforeDate = new Date();
-    beforeDate.setDate(beforeDate.getDate() - olderThanDays);
-    
-    const { count, error } = await this.client
-      .from('activityLogs')
-      .delete({ count: 'exact' })
-      .lt('timestamp', beforeDate.toISOString());
-    
-    if (error) throw error;
-    return count || 0;
-  }
-
-  // Stub implementations for compatibility
-  async getSystemStats(): Promise<{
-    totalTransactions: number;
-    totalAccounts: number;
-    totalCategories: number;
-    totalProducts: number;
-    systemHealth: string;
-  }> {
-    return {
-      totalTransactions: 0,
-      totalAccounts: 0,
-      totalCategories: 0,
-      totalProducts: 0,
-      systemHealth: "healthy",
-    };
   }
 }

@@ -159,14 +159,9 @@ export class InitializationManager {
         const { SupabaseStorage } = await import('./supabase-storage');
         storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!);
         
-        // Initialize schema (non-blocking for Supabase)
-        try {
-          await storage.initializeSchema();
-          console.log('Supabase schema initialization completed');
-        } catch (error) {
-          console.warn('Schema initialization warning (proceeding anyway):', error);
-          // Don't fail initialization for schema issues - Supabase will handle table creation dynamically
-        }
+        // For Supabase, skip schema initialization during setup
+        // Tables will be created through the SQL editor as instructed
+        console.log('Supabase integration - schema should be created via SQL editor');
       } else {
         // For external databases, add configuration and use it
         dbConfigResult = await this.databaseManager.addDatabaseConfig({

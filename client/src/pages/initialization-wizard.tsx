@@ -564,20 +564,21 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
 
                 {/* Special guidance for Supabase */}
                 {selectedProvider === 'supabase' && (
-                  <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <div className="flex items-start space-x-3">
-                      <div className="text-green-600 dark:text-green-400 mt-0.5">
-                        <CheckCircle2 className="w-5 h-5" />
+                      <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                        <Database className="w-5 h-5" />
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-medium text-green-900 dark:text-green-100">Automatic Supabase Setup</h4>
-                        <p className="text-sm text-green-800 dark:text-green-200">
-                          The database schema will be created automatically when you complete the setup. No manual SQL execution required!
+                        <h4 className="font-medium text-blue-900 dark:text-blue-100">One-Time Supabase Setup</h4>
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          After testing your connection, you'll need to run the SQL schema once in your Supabase dashboard. After that, everything is automatic!
                         </p>
-                        <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
-                          <p>• Provide your Supabase Project URL and Anonymous Key</p>
-                          <p>• Test connection to verify credentials</p>
-                          <p>• Complete setup - database tables will be created automatically</p>
+                        <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                          <p>• Test connection first to verify credentials</p>
+                          <p>• Copy SQL from <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">server/supabase-schema.sql</code></p>
+                          <p>• Run once in Supabase SQL Editor</p>
+                          <p>• Complete setup - all future operations will be automatic</p>
                         </div>
                       </div>
                     </div>
