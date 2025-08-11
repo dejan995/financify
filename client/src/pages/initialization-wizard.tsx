@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
-import { User, Database, Shield, CheckCircle, ArrowRight, ArrowLeft } from "lucide-react";
+import { User, Database, Shield, CheckCircle, ArrowRight, ArrowLeft, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { supportedDatabaseProviders, databaseProviderInfo } from "@shared/database-config";
 
 const adminSetupSchema = z.object({
@@ -75,10 +75,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
   // Test database connection mutation
   const testConnectionMutation = useMutation({
     mutationFn: async (data: DatabaseSetupForm) => {
-      return apiRequest("/api/initialization/test-database", {
-        method: "POST",
-        body: data,
-      });
+      return apiRequest("POST", "/api/initialization/test-database", data);
     },
   });
 
