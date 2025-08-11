@@ -55,15 +55,15 @@ function UserForm({ onClose, user }: UserFormProps) {
     defaultValues: {
       username: user?.username || "",
       email: user?.email || "",
-      name: user?.name || "",
+      name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : "",
       password: "",
       role: user?.role as "admin" | "user" | "guest" || "user",
       isActive: user?.isActive ?? true,
-      phoneNumber: user?.phoneNumber || "",
-      timezone: user?.timezone || "UTC",
-      currency: user?.currency || "USD",
-      language: user?.language || "en",
-      emailNotifications: user?.emailNotifications ?? true,
+      phoneNumber: "",
+      timezone: "UTC",
+      currency: "USD",
+      language: "en",
+      emailNotifications: true,
     },
   });
 
@@ -505,7 +505,7 @@ export default function Admin() {
                           </div>
                           <p className="text-sm text-muted-foreground">{user.email}</p>
                           <p className="text-xs text-muted-foreground">
-                            Last login: {user.lastLogin ? formatDate(user.lastLogin) : "Never"}
+                            Last login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : "Never"}
                           </p>
                         </div>
                       </div>
@@ -602,8 +602,12 @@ export default function Admin() {
                   <CardContent>
                     <div className="text-2xl font-bold">
                       {databaseConfigs && databaseConfigs.length > 0 
-                        ? databaseConfigs.find(db => db.isActive)?.provider?.charAt(0).toUpperCase() + 
-                          databaseConfigs.find(db => db.isActive)?.provider?.slice(1) || "Unknown"
+                        ? (() => {
+                            const activeDb = databaseConfigs.find(db => db.isActive);
+                            return activeDb?.provider 
+                              ? activeDb.provider.charAt(0).toUpperCase() + activeDb.provider.slice(1)
+                              : "Unknown";
+                          })()
                         : "In Memory"
                       }
                     </div>
