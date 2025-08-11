@@ -94,8 +94,19 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
   // Initialize application mutation
   const initializationMutation = useMutation({
     mutationFn: async (data: { admin: AdminSetupForm; database: DatabaseSetupForm }) => {
-      const response = await apiRequest("POST", "/api/initialization", data);
-      return response;
+      const response = await fetch("/api/initialization", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Initialization failed');
+      }
+      return result;
     },
     onSuccess: () => {
       toast({
@@ -105,11 +116,23 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
       onComplete();
     },
     onError: (error: any) => {
-      toast({
-        title: "Initialization Failed",
-        description: error.message || "Failed to initialize the application",
-        variant: "destructive",
-      });
+      const errorMessage = error.message || "Failed to initialize the application";
+      
+      // Show detailed error for Supabase setup
+      if (errorMessage.includes("SUPABASE SETUP REQUIRED")) {
+        toast({
+          title: "Supabase Setup Required",
+          description: "Database schema needs to be created. Check console for detailed instructions.",
+          variant: "destructive",
+        });
+        console.error("Supabase Setup Instructions:", errorMessage);
+      } else {
+        toast({
+          title: "Initialization Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -538,6 +561,29 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                 />
 
                 {renderProviderFields()}
+
+                {/* Special guidance for Supabase */}
+                {selectedProvider === 'supabase' && (
+                  <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-start space-x-3">
+                      <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                        <Database className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-blue-900 dark:text-blue-100">Supabase Setup Required</h4>
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                          After testing your connection, you'll need to create the database schema in your Supabase dashboard before completing setup.
+                        </p>
+                        <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                          <p>• Test connection first to verify credentials</p>
+                          <p>• Copy SQL from <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">server/supabase-schema.sql</code></p>
+                          <p>• Run in Supabase SQL Editor</p>
+                          <p>• Return here to complete setup</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Connection Test Section for external databases */}
                 {selectedProvider !== 'sqlite' && (
