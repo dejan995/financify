@@ -2,23 +2,32 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { IStorage } from "./storage";
 import { initializeSupabaseClient } from "./supabase-client";
 import { UpsertUser, User } from "@shared/schema";
+import { SupabaseManagement } from "./supabase-management";
 
 export class SupabaseStorage implements IStorage {
   private client: SupabaseClient;
+  private management: SupabaseManagement;
+  private supabaseUrl: string;
+  private supabaseAnonKey: string;
 
   constructor(supabaseUrl: string, supabaseAnonKey: string) {
+    this.supabaseUrl = supabaseUrl;
+    this.supabaseAnonKey = supabaseAnonKey;
     this.client = initializeSupabaseClient(supabaseUrl, supabaseAnonKey);
+    this.management = new SupabaseManagement(this.client, supabaseUrl, supabaseAnonKey);
   }
 
   async initializeSchema(): Promise<void> {
-    console.log('Checking and creating Supabase tables...');
+    console.log('Initializing Supabase schema automatically...');
     
     try {
-      // Try to create the users table if it doesn't exist
-      await this.createUsersTable();
-      console.log('Users table ready');
+      // Use Management API to create all tables automatically
+      await this.management.createAllTables();
+      console.log('All Supabase tables created successfully');
     } catch (error) {
-      console.log('Table creation completed:', error);
+      console.error('Failed to create tables automatically:', error);
+      // Continue anyway - tables might already exist
+      console.log('Proceeding with existing schema...');
     }
   }
 
