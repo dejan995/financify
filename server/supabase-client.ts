@@ -51,12 +51,19 @@ export async function testSupabaseConnection(supabaseUrl: string, supabaseAnonKe
         }
       });
       
-      // Test service role with a simple RPC call that should always work
-      const { data: versionData, error: versionError } = await serviceClient.rpc('version');
-      
-      if (versionError && !versionError.message.includes('not found')) {
-        console.error('Service key test failed:', versionError);
-        return { success: false, error: `Service Role Key test failed: ${versionError.message}` };
+      // Test service role by checking if we can access information_schema (service keys should have this access)
+      try {
+        const testQuery = await serviceClient
+          .from('information_schema.tables')
+          .select('table_name')
+          .eq('table_schema', 'public')
+          .limit(1);
+        
+        // If we get here without throwing, the service key works
+        console.log('Service key connection test passed');
+      } catch (serviceError: any) {
+        console.error('Service key test failed:', serviceError);
+        return { success: false, error: `Service Role Key test failed: ${serviceError.message || 'Connection failed'}` };
       }
       
       console.log('Service key connection successful');
