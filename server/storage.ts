@@ -767,15 +767,24 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
         const supabaseConfig = dbConfigs.find((cfg: any) => cfg.provider === 'supabase');
         
         if (supabaseConfig) {
-          console.log('Found Supabase credentials, initializing storage...');
-          const { SupabaseStorageNew } = await import('./supabase-storage-new');
-          storageInstance = new SupabaseStorageNew(
-            supabaseConfig.supabaseUrl!,
-            supabaseConfig.supabaseAnonKey!,
-            supabaseConfig.supabaseServiceKey!
-          );
-          console.log('✓ Supabase storage restored successfully');
-          return storageInstance;
+          console.log('Found Supabase credentials, checking validity...');
+          
+          // Skip if placeholder credentials
+          if (supabaseConfig.supabaseUrl === 'placeholder_url' || 
+              supabaseConfig.supabaseAnonKey === 'placeholder_anon_key' ||
+              supabaseConfig.supabaseServiceKey === 'placeholder_service_key') {
+            console.log('Placeholder Supabase credentials detected, skipping...');
+          } else {
+            console.log('Valid Supabase credentials found, initializing storage...');
+            const { SupabaseStorageNew } = await import('./supabase-storage-new');
+            storageInstance = new SupabaseStorageNew(
+              supabaseConfig.supabaseUrl!,
+              supabaseConfig.supabaseAnonKey!,
+              supabaseConfig.supabaseServiceKey!
+            );
+            console.log('✓ Supabase storage restored successfully');
+            return storageInstance;
+          }
         } else {
           console.log('Supabase config not found in saved configurations');
         }

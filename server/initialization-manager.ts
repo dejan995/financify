@@ -179,6 +179,24 @@ export class InitializationManager {
         
         storage = new SupabaseStorageNew(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!, databaseConfig.supabaseServiceKey!);
         
+        // Save Supabase credentials to database config manager for restoration
+        const { databaseConfigManager } = await import('./database-config-manager');
+        const supabaseConfigId = `supabase-${Date.now()}`;
+        await databaseConfigManager.saveConfig({
+          id: supabaseConfigId,
+          name: databaseConfig.name || 'Supabase Database',
+          provider: 'supabase',
+          supabaseUrl: databaseConfig.supabaseUrl!,
+          supabaseAnonKey: databaseConfig.supabaseAnonKey!,
+          supabaseServiceKey: databaseConfig.supabaseServiceKey!,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        
+        dbConfigResult = { id: supabaseConfigId } as DatabaseConfig;
+        console.log('Supabase configuration saved to database config manager');
+        
         // Initialize Supabase schema - new implementation checks table existence
         try {
           await storage.initializeSchema();
