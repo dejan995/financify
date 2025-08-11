@@ -437,6 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/users/:id", requireAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log("Update request body:", JSON.stringify(req.body, null, 2));
       const updates = updateUserSchema.parse(req.body);
       
       // If password is provided, hash it

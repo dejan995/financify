@@ -82,7 +82,10 @@ function UserForm({ onClose, user }: UserFormProps) {
 
   const updateMutation = useMutation({
     mutationFn: (data: UserFormData) => {
-      return apiRequest("PUT", `/api/admin/users/${user!.id}`, data);
+      // Remove empty password field for updates
+      const { password, ...dataWithoutPassword } = data;
+      const updateData = password && password.trim() ? data : dataWithoutPassword;
+      return apiRequest("PUT", `/api/admin/users/${user!.id}`, updateData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
