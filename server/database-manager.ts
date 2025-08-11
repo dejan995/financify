@@ -343,9 +343,146 @@ export class DatabaseManager {
   }
 
   private async ensureSchema(db: any, provider: DatabaseProvider) {
-    // In a real implementation, this would run migrations
-    // For now, we'll assume the schema exists
     console.log(`Ensuring schema exists for ${provider}`);
+    
+    try {
+      // Import the schema and migration utilities
+      const schema = await import('@shared/schema');
+      
+      // For SQLite, we need to create tables manually since we're not using migrations
+      if (provider === 'sqlite') {
+        // Create tables if they don't exist
+        const createTableQueries = [
+          `CREATE TABLE IF NOT EXISTS "users" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "username" text NOT NULL,
+            "email" text NOT NULL,
+            "password_hash" text NOT NULL,
+            "first_name" text,
+            "last_name" text,
+            "profile_image_url" text,
+            "role" text DEFAULT 'user' NOT NULL,
+            "is_active" integer DEFAULT true NOT NULL,
+            "is_email_verified" integer DEFAULT false NOT NULL,
+            "email_verification_token" text,
+            "password_reset_token" text,
+            "password_reset_expires" integer,
+            "last_login_at" integer,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL
+          )`,
+          `CREATE TABLE IF NOT EXISTS "categories" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "user_id" integer NOT NULL,
+            "name" text NOT NULL,
+            "color" text NOT NULL,
+            "type" text DEFAULT 'expense' NOT NULL,
+            "parent_id" integer,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade,
+            FOREIGN KEY ("parent_id") REFERENCES "categories"("id") ON DELETE set null
+          )`,
+          `CREATE TABLE IF NOT EXISTS "accounts" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "user_id" integer NOT NULL,
+            "name" text NOT NULL,
+            "type" text NOT NULL,
+            "balance" real DEFAULT 0 NOT NULL,
+            "currency" text DEFAULT 'USD' NOT NULL,
+            "is_active" integer DEFAULT true NOT NULL,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade
+          )`,
+          `CREATE TABLE IF NOT EXISTS "transactions" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "user_id" integer NOT NULL,
+            "account_id" integer NOT NULL,
+            "category_id" integer,
+            "amount" real NOT NULL,
+            "description" text NOT NULL,
+            "date" integer NOT NULL,
+            "type" text NOT NULL,
+            "tags" text,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade,
+            FOREIGN KEY ("account_id") REFERENCES "accounts"("id") ON DELETE cascade,
+            FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE set null
+          )`,
+          `CREATE TABLE IF NOT EXISTS "budgets" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "user_id" integer NOT NULL,
+            "category_id" integer NOT NULL,
+            "amount" real NOT NULL,
+            "period" text DEFAULT 'monthly' NOT NULL,
+            "start_date" integer NOT NULL,
+            "end_date" integer,
+            "is_active" integer DEFAULT true NOT NULL,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade,
+            FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE cascade
+          )`,
+          `CREATE TABLE IF NOT EXISTS "goals" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "user_id" integer NOT NULL,
+            "name" text NOT NULL,
+            "description" text,
+            "target_amount" real NOT NULL,
+            "current_amount" real DEFAULT 0 NOT NULL,
+            "target_date" integer,
+            "is_completed" integer DEFAULT false NOT NULL,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade
+          )`,
+          `CREATE TABLE IF NOT EXISTS "bills" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "user_id" integer NOT NULL,
+            "name" text NOT NULL,
+            "amount" real NOT NULL,
+            "due_date" integer NOT NULL,
+            "frequency" text DEFAULT 'monthly' NOT NULL,
+            "category_id" integer,
+            "account_id" integer,
+            "is_active" integer DEFAULT true NOT NULL,
+            "last_paid" integer,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE cascade,
+            FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE set null,
+            FOREIGN KEY ("account_id") REFERENCES "accounts"("id") ON DELETE set null
+          )`,
+          `CREATE TABLE IF NOT EXISTS "products" (
+            "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+            "name" text NOT NULL,
+            "barcode" text,
+            "category" text,
+            "brand" text,
+            "average_price" real,
+            "currency" text DEFAULT 'USD' NOT NULL,
+            "created_at" integer DEFAULT (unixepoch()) NOT NULL,
+            "updated_at" integer DEFAULT (unixepoch()) NOT NULL
+          )`
+        ];
+
+        // Execute each CREATE TABLE query
+        for (const query of createTableQueries) {
+          await db.run(query);
+        }
+        
+        console.log(`Created SQLite schema with ${createTableQueries.length} tables`);
+      } else {
+        // For other database types, we would run proper migrations
+        // For now, we assume they exist or use Drizzle's push feature
+        console.log(`Schema verification for ${provider} - assuming tables exist`);
+      }
+    } catch (error) {
+      console.error(`Error ensuring schema for ${provider}:`, error);
+      throw error;
+    }
   }
 
   private async extractAllData(fromConfigId: string | null) {
