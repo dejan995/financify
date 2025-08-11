@@ -35,71 +35,91 @@ export class SupabaseStorage implements IStorage {
   }
 
   private async createUsersTableViaAPI(): Promise<void> {
-    console.log('Creating users table via Supabase Database API...');
+    console.log('Creating users table using service role key with direct SQL execution...');
     
     const createTableSQL = `
-      CREATE TABLE IF NOT EXISTS public.users (
-        id BIGSERIAL PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        first_name TEXT,
-        last_name TEXT,
-        profile_image_url TEXT,
-        role TEXT DEFAULT 'user',
-        is_active BOOLEAN DEFAULT true,
-        is_email_verified BOOLEAN DEFAULT false,
-        email_verification_token TEXT,
-        password_reset_token TEXT,
-        password_reset_expires TIMESTAMP,
-        last_login_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `;
+CREATE TABLE IF NOT EXISTS public.users (
+  id BIGSERIAL PRIMARY KEY,
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
+  profile_image_url TEXT,
+  role TEXT DEFAULT 'user',
+  is_active BOOLEAN DEFAULT true,
+  is_email_verified BOOLEAN DEFAULT false,
+  email_verification_token TEXT,
+  password_reset_token TEXT,
+  password_reset_expires TIMESTAMP,
+  last_login_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Enable RLS but allow service role to bypass it
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+
+-- Create policy that allows service role to insert
+CREATE POLICY "Allow service role access" ON public.users
+  FOR ALL 
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+`;
+
+    // Create service client for SQL execution
+    const { createClient } = await import('@supabase/supabase-js');
+    const serviceClient = createClient(this.supabaseUrl, this.supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     try {
-      // Use Supabase's database management API
-      const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/exec`, {
+      console.log('Attempting SQL execution using service client...');
+      
+      // Try using the sql function if available
+      const { error } = await serviceClient.sql`${createTableSQL}`;
+      
+      if (!error) {
+        console.log('Users table created successfully via SQL execution!');
+        return;
+      }
+      
+      console.log('Direct SQL not available, trying RPC approach...');
+    } catch (sqlError) {
+      console.log('SQL execution not supported, trying alternative...');
+    }
+
+    try {
+      // Try via REST API with proper headers
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/sql`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.supabaseServiceKey}`,
           'apikey': this.supabaseServiceKey,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({ 
-          query: createTableSQL 
-        })
-      });
-
-      if (response.ok) {
-        console.log('Users table created successfully via Database API');
-        return;
-      }
-
-      // Try alternative endpoint
-      const altResponse = await fetch(`${this.supabaseUrl}/database/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.supabaseServiceKey}`,
-          'apikey': this.supabaseServiceKey
+          'Content-Profile': 'public'
         },
         body: JSON.stringify({ 
           sql: createTableSQL 
         })
       });
 
-      if (altResponse.ok) {
-        console.log('Users table created via alternative Database API');
+      const responseText = await response.text();
+      console.log('SQL API Response:', response.status, responseText);
+
+      if (response.ok) {
+        console.log('Users table created via REST SQL API');
         return;
       }
-
-      console.log('Database API not available - will create table via insert operation');
-    } catch (error) {
-      console.log('Database API creation failed - table will be created during first insert');
+    } catch (apiError) {
+      console.log('REST API approach failed:', apiError);
     }
+
+    console.log('All table creation methods attempted - will proceed with insert operation');
   }
 
   private async ensureUsersTableExists(): Promise<void> {
@@ -477,42 +497,47 @@ export class SupabaseStorage implements IStorage {
       if (error) {
         console.error('Supabase user creation error:', error);
         
-        // If we get an empty error object or table doesn't exist, create it manually
+        // If we get an empty error object, it's usually a permissions or table issue
         if (Object.keys(error).length === 0 || (error.message && error.message.includes('does not exist'))) {
-          console.log('Table may not exist - attempting manual table creation...');
+          console.log('Empty error detected - forcing table creation and retry...');
           
           try {
-            // Force table creation by using a simpler schema first
-            const simpleData = {
-              username: dbUserData.username,
-              email: dbUserData.email,
-              password_hash: dbUserData.password_hash,
-              role: dbUserData.role || 'admin'
-            };
+            // Force create the table again
+            await this.createUsersTableViaAPI();
             
-            console.log('Trying with minimal data structure...');
-            const { data: simpleResult, error: simpleError } = await serviceClient
+            console.log('Retrying user insert after table creation...');
+            const { data: retryData, error: retryError } = await serviceClient
               .from('users')
-              .insert(simpleData)
+              .insert(dbUserData)
               .select()
               .single();
             
-            if (!simpleError && simpleResult) {
-              // Now update with full data
-              const { data: fullData, error: updateError } = await serviceClient
-                .from('users')
-                .update(dbUserData)
-                .eq('id', simpleResult.id)
-                .select()
-                .single();
-              
-              if (!updateError && fullData) {
-                console.log('User created successfully via two-step process');
-                return fullData;
-              }
+            if (!retryError && retryData) {
+              console.log('User created successfully after table creation');
+              return retryData;
             }
-          } catch (manualError) {
-            console.log('Manual creation also failed:', manualError);
+            
+            if (retryError && Object.keys(retryError).length > 0) {
+              console.log('Retry failed with specific error:', retryError);
+              throw new Error(`User creation failed: ${retryError.message || retryError.code}`);
+            }
+            
+            console.log('Retry also returned empty error - checking if user was created...');
+            
+            // Check if the user was actually created despite the empty error
+            const { data: checkData, error: checkError } = await serviceClient
+              .from('users')
+              .select('*')
+              .eq('username', dbUserData.username)
+              .single();
+            
+            if (checkData && !checkError) {
+              console.log('User was created successfully despite empty error response');
+              return checkData;
+            }
+            
+          } catch (forceError) {
+            console.log('Force creation and retry failed:', forceError);
           }
         }
         
