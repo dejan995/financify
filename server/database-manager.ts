@@ -261,53 +261,53 @@ export class DatabaseManager {
       const targetDb = this.createDrizzleInstance(targetConnection, toConfig.provider);
       
       // Ensure schema exists in target database
-      await this.ensureSchema(targetDb, toConfig.provider);
+      await this.ensureSchema(targetConnection, toConfig.provider);
       
       // Migrate data in order (respecting foreign key constraints)
       let totalRecords = 0;
       
       // 1. Users first
       if (sourceData.users.length > 0) {
-        await this.insertUsers(targetDb, sourceData.users);
+        await this.insertUsers(targetConnection, sourceData.users, toConfig.provider);
         totalRecords += sourceData.users.length;
       }
       
       // 2. Categories
       if (sourceData.categories.length > 0) {
-        await this.insertCategories(targetDb, sourceData.categories);
+        await this.insertCategories(targetConnection, sourceData.categories, toConfig.provider);
         totalRecords += sourceData.categories.length;
       }
       
       // 3. Accounts
       if (sourceData.accounts.length > 0) {
-        await this.insertAccounts(targetDb, sourceData.accounts);
+        await this.insertAccounts(targetConnection, sourceData.accounts, toConfig.provider);
         totalRecords += sourceData.accounts.length;
       }
       
       // 4. Transactions
       if (sourceData.transactions.length > 0) {
-        await this.insertTransactions(targetDb, sourceData.transactions);
+        await this.insertTransactions(targetConnection, sourceData.transactions, toConfig.provider);
         totalRecords += sourceData.transactions.length;
       }
       
       // 5. Other entities
       if (sourceData.budgets.length > 0) {
-        await this.insertBudgets(targetDb, sourceData.budgets);
+        await this.insertBudgets(targetConnection, sourceData.budgets, toConfig.provider);
         totalRecords += sourceData.budgets.length;
       }
       
       if (sourceData.goals.length > 0) {
-        await this.insertGoals(targetDb, sourceData.goals);
+        await this.insertGoals(targetConnection, sourceData.goals, toConfig.provider);
         totalRecords += sourceData.goals.length;
       }
       
       if (sourceData.bills.length > 0) {
-        await this.insertBills(targetDb, sourceData.bills);
+        await this.insertBills(targetConnection, sourceData.bills, toConfig.provider);
         totalRecords += sourceData.bills.length;
       }
       
       if (sourceData.products.length > 0) {
-        await this.insertProducts(targetDb, sourceData.products);
+        await this.insertProducts(targetConnection, sourceData.products, toConfig.provider);
         totalRecords += sourceData.products.length;
       }
 
@@ -548,155 +548,259 @@ export class DatabaseManager {
     };
   }
 
-  private async insertUsers(db: any, users: any[]) {
+  private async insertUsers(connection: any, users: any[], provider: DatabaseProvider) {
     if (users.length === 0) return;
     
-    // For SQLite, use raw SQL to avoid Drizzle type conversion issues
-    const stmt = db.prepare(`
-      INSERT INTO users (
-        username, email, password_hash, first_name, last_name, 
-        profile_image_url, role, is_active, is_email_verified,
-        email_verification_token, password_reset_token, password_reset_expires,
-        last_login_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    for (const user of users) {
-      stmt.run(
-        user.username,
-        user.email,
-        user.passwordHash,
-        user.firstName || null,
-        user.lastName || null,
-        user.profileImageUrl || null,
-        user.role || 'user',
-        user.isActive ? 1 : 0,
-        user.isEmailVerified ? 1 : 0,
-        user.emailVerificationToken || null,
-        user.passwordResetToken || null,
-        user.passwordResetExpires ? Math.floor(new Date(user.passwordResetExpires).getTime() / 1000) : null,
-        user.lastLoginAt ? Math.floor(new Date(user.lastLoginAt).getTime() / 1000) : null,
-        user.createdAt ? Math.floor(new Date(user.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-        user.updatedAt ? Math.floor(new Date(user.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-      );
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO users (
+          username, email, password_hash, first_name, last_name, 
+          profile_image_url, role, is_active, is_email_verified,
+          email_verification_token, password_reset_token, password_reset_expires,
+          last_login_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const user of users) {
+        stmt.run(
+          user.username,
+          user.email,
+          user.passwordHash,
+          user.firstName || null,
+          user.lastName || null,
+          user.profileImageUrl || null,
+          user.role || 'user',
+          user.isActive ? 1 : 0,
+          user.isEmailVerified ? 1 : 0,
+          user.emailVerificationToken || null,
+          user.passwordResetToken || null,
+          user.passwordResetExpires ? Math.floor(new Date(user.passwordResetExpires).getTime() / 1000) : null,
+          user.lastLoginAt ? Math.floor(new Date(user.lastLoginAt).getTime() / 1000) : null,
+          user.createdAt ? Math.floor(new Date(user.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          user.updatedAt ? Math.floor(new Date(user.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.users).values(users);
     }
   }
 
-  private async insertCategories(db: any, categories: any[]) {
+  private async insertCategories(connection: any, categories: any[], provider: DatabaseProvider) {
     if (categories.length === 0) return;
     
-    // For SQLite, use raw SQL to avoid Drizzle type conversion issues
-    const stmt = db.prepare(`
-      INSERT INTO categories (
-        user_id, name, color, type, parent_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    for (const category of categories) {
-      stmt.run(
-        category.userId,
-        category.name,
-        category.color,
-        category.type || 'expense',
-        category.parentId || null,
-        category.createdAt ? Math.floor(new Date(category.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-        category.updatedAt ? Math.floor(new Date(category.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-      );
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO categories (
+          user_id, name, color, type, parent_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const category of categories) {
+        stmt.run(
+          category.userId,
+          category.name,
+          category.color,
+          category.type || 'expense',
+          category.parentId || null,
+          category.createdAt ? Math.floor(new Date(category.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          category.updatedAt ? Math.floor(new Date(category.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.categories).values(categories);
     }
   }
 
-  private async insertAccounts(db: any, accounts: any[]) {
+  private async insertAccounts(connection: any, accounts: any[], provider: DatabaseProvider) {
     if (accounts.length === 0) return;
     
-    // Transform account data for SQLite
-    const transformedAccounts = accounts.map(account => ({
-      ...account,
-      createdAt: account.createdAt ? Math.floor(new Date(account.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: account.updatedAt ? Math.floor(new Date(account.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
-    
-    await db.insert(schema.accounts).values(transformedAccounts);
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO accounts (
+          user_id, name, type, balance, currency, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const account of accounts) {
+        stmt.run(
+          account.userId,
+          account.name,
+          account.type,
+          account.balance || 0,
+          account.currency || 'USD',
+          account.isActive ? 1 : 0,
+          account.createdAt ? Math.floor(new Date(account.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          account.updatedAt ? Math.floor(new Date(account.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.accounts).values(accounts);
+    }
   }
 
-  private async insertTransactions(db: any, transactions: any[]) {
+  private async insertTransactions(connection: any, transactions: any[], provider: DatabaseProvider) {
     if (transactions.length === 0) return;
     
-    // Transform transaction data for SQLite
-    const transformedTransactions = transactions.map(transaction => ({
-      ...transaction,
-      date: transaction.date ? Math.floor(new Date(transaction.date).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      createdAt: transaction.createdAt ? Math.floor(new Date(transaction.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: transaction.updatedAt ? Math.floor(new Date(transaction.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
-    
-    await db.insert(schema.transactions).values(transformedTransactions);
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO transactions (
+          user_id, account_id, category_id, amount, description, date, type, tags, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const transaction of transactions) {
+        stmt.run(
+          transaction.userId,
+          transaction.accountId,
+          transaction.categoryId || null,
+          transaction.amount,
+          transaction.description,
+          transaction.date ? Math.floor(new Date(transaction.date).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          transaction.type,
+          transaction.tags || null,
+          transaction.createdAt ? Math.floor(new Date(transaction.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          transaction.updatedAt ? Math.floor(new Date(transaction.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.transactions).values(transactions);
+    }
   }
 
-  private async insertBudgets(db: any, budgets: any[]) {
+  private async insertBudgets(connection: any, budgets: any[], provider: DatabaseProvider) {
     if (budgets.length === 0) return;
     
-    // Transform budget data for SQLite
-    const transformedBudgets = budgets.map(budget => ({
-      ...budget,
-      startDate: budget.startDate ? Math.floor(new Date(budget.startDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      endDate: budget.endDate ? Math.floor(new Date(budget.endDate).getTime() / 1000) : null,
-      createdAt: budget.createdAt ? Math.floor(new Date(budget.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: budget.updatedAt ? Math.floor(new Date(budget.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
-    
-    await db.insert(schema.budgets).values(transformedBudgets);
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO budgets (
+          user_id, category_id, amount, period, start_date, end_date, is_active, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const budget of budgets) {
+        stmt.run(
+          budget.userId,
+          budget.categoryId,
+          budget.amount,
+          budget.period || 'monthly',
+          budget.startDate ? Math.floor(new Date(budget.startDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          budget.endDate ? Math.floor(new Date(budget.endDate).getTime() / 1000) : null,
+          budget.isActive ? 1 : 0,
+          budget.createdAt ? Math.floor(new Date(budget.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          budget.updatedAt ? Math.floor(new Date(budget.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.budgets).values(budgets);
+    }
   }
 
-  private async insertGoals(db: any, goals: any[]) {
+  private async insertGoals(connection: any, goals: any[], provider: DatabaseProvider) {
     if (goals.length === 0) return;
     
-    // Transform goal data for SQLite
-    const transformedGoals = goals.map(goal => ({
-      ...goal,
-      targetDate: goal.targetDate ? Math.floor(new Date(goal.targetDate).getTime() / 1000) : null,
-      createdAt: goal.createdAt ? Math.floor(new Date(goal.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: goal.updatedAt ? Math.floor(new Date(goal.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
-    
-    await db.insert(schema.goals).values(transformedGoals);
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO goals (
+          user_id, name, description, target_amount, current_amount, target_date, is_completed, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const goal of goals) {
+        stmt.run(
+          goal.userId,
+          goal.name,
+          goal.description || null,
+          goal.targetAmount,
+          goal.currentAmount || 0,
+          goal.targetDate ? Math.floor(new Date(goal.targetDate).getTime() / 1000) : null,
+          goal.isCompleted ? 1 : 0,
+          goal.createdAt ? Math.floor(new Date(goal.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          goal.updatedAt ? Math.floor(new Date(goal.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.goals).values(goals);
+    }
   }
 
-  private async insertBills(db: any, bills: any[]) {
+  private async insertBills(connection: any, bills: any[], provider: DatabaseProvider) {
     if (bills.length === 0) return;
     
-    // Transform bill data for SQLite
-    const transformedBills = bills.map(bill => ({
-      ...bill,
-      dueDate: bill.dueDate ? Math.floor(new Date(bill.dueDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      lastPaid: bill.lastPaid ? Math.floor(new Date(bill.lastPaid).getTime() / 1000) : null,
-      createdAt: bill.createdAt ? Math.floor(new Date(bill.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: bill.updatedAt ? Math.floor(new Date(bill.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
-    
-    await db.insert(schema.bills).values(transformedBills);
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO bills (
+          user_id, name, amount, due_date, frequency, category_id, account_id, is_active, last_paid, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const bill of bills) {
+        stmt.run(
+          bill.userId,
+          bill.name,
+          bill.amount,
+          bill.dueDate ? Math.floor(new Date(bill.dueDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          bill.frequency || 'monthly',
+          bill.categoryId || null,
+          bill.accountId || null,
+          bill.isActive ? 1 : 0,
+          bill.lastPaid ? Math.floor(new Date(bill.lastPaid).getTime() / 1000) : null,
+          bill.createdAt ? Math.floor(new Date(bill.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          bill.updatedAt ? Math.floor(new Date(bill.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.bills).values(bills);
+    }
   }
 
-  private async insertProducts(db: any, products: any[]) {
+  private async insertProducts(connection: any, products: any[], provider: DatabaseProvider) {
     if (products.length === 0) return;
     
-    // For SQLite, use raw SQL to avoid Drizzle type conversion issues
-    const stmt = db.prepare(`
-      INSERT INTO products (
-        name, barcode, category, brand, average_price, currency, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    for (const product of products) {
-      stmt.run(
-        product.name,
-        product.barcode || null,
-        product.category || null,
-        product.brand || null,
-        product.averagePrice || null,
-        product.currency || 'USD',
-        product.createdAt ? Math.floor(new Date(product.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-        product.updatedAt ? Math.floor(new Date(product.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-      );
+    if (provider === 'sqlite') {
+      // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+      const stmt = connection.prepare(`
+        INSERT INTO products (
+          name, barcode, category, brand, average_price, currency, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
+      for (const product of products) {
+        stmt.run(
+          product.name,
+          product.barcode || null,
+          product.category || null,
+          product.brand || null,
+          product.averagePrice || null,
+          product.currency || 'USD',
+          product.createdAt ? Math.floor(new Date(product.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+          product.updatedAt ? Math.floor(new Date(product.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+        );
+      }
+    } else {
+      // For other databases, use Drizzle ORM
+      const db = this.createDrizzleInstance(connection, provider);
+      await db.insert(schema.products).values(products);
     }
   }
 
