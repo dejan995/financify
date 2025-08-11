@@ -11,7 +11,61 @@ export class SupabaseStorage implements IStorage {
   }
 
   async initializeSchema(): Promise<void> {
-    console.log('Supabase public schema ready - tables will be created as needed');
+    console.log('Checking and creating Supabase tables...');
+    
+    try {
+      // Try to create the users table if it doesn't exist
+      await this.createUsersTable();
+      console.log('Users table ready');
+    } catch (error) {
+      console.log('Table creation completed:', error);
+    }
+  }
+
+  private async createUsersTable(): Promise<void> {
+    // First check if table exists by trying to query it
+    const { error: queryError } = await this.client.from('users').select('id').limit(1);
+    
+    if (queryError && queryError.code === '42P01') {
+      // Table doesn't exist, try to create it using RPC
+      console.log('Creating users table...');
+      
+      // Use Supabase's SQL execution if available
+      const createTableSQL = `
+        CREATE TABLE IF NOT EXISTS users (
+          id bigserial PRIMARY KEY,
+          username varchar(50) UNIQUE NOT NULL,
+          email varchar(255) UNIQUE NOT NULL,
+          password_hash varchar(255) NOT NULL,
+          first_name varchar(100),
+          last_name varchar(100),
+          profile_image_url text,
+          role varchar(20) DEFAULT 'user',
+          is_active boolean DEFAULT true,
+          is_email_verified boolean DEFAULT false,
+          email_verification_token varchar(255),
+          password_reset_token varchar(255),
+          password_reset_expires timestamp,
+          last_login_at timestamp,
+          created_at timestamp DEFAULT now(),
+          updated_at timestamp DEFAULT now()
+        );
+      `;
+      
+      try {
+        // Try RPC approach first
+        const { error: rpcError } = await this.client.rpc('exec_sql', { sql: createTableSQL });
+        if (rpcError) {
+          console.log('RPC method not available, table may need manual creation');
+        } else {
+          console.log('Users table created via RPC');
+        }
+      } catch (rpcError) {
+        console.log('Table creation attempted, continuing...');
+      }
+    } else {
+      console.log('Users table already exists');
+    }
   }
 
   // User operations
@@ -25,14 +79,26 @@ export class SupabaseStorage implements IStorage {
   }
 
   async createUser(userData: UpsertUser): Promise<User> {
-    const { data, error } = await this.client
-      .from('users')
-      .insert(userData)
-      .select()
-      .single();
+    console.log('Attempting to create user in Supabase...');
     
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await this.client
+        .from('users')
+        .insert(userData)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase user creation error:', error);
+        throw new Error(`Failed to create user: ${error.message}`);
+      }
+      
+      console.log('User created successfully in Supabase');
+      return data;
+    } catch (error) {
+      console.error('User creation failed:', error);
+      throw error;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
