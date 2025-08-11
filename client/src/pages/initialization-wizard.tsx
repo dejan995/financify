@@ -158,6 +158,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
   const handleTestConnection = async () => {
     const data = databaseForm.getValues();
     console.log('Form data being sent:', data); // Debug log
+    console.log('Form state errors:', databaseForm.formState.errors); // Debug form errors
     setHasTestedConnection(false);
     setConnectionTestResult(null);
     
@@ -269,6 +270,8 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                       type="password"
                       placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                       {...field}
+                      value={field.value || ''}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormDescription>
@@ -289,6 +292,8 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                       type="password"
                       placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
                       {...field}
+                      value={field.value || ''}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormDescription>
