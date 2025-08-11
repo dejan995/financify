@@ -91,6 +91,25 @@ export class SupabaseStorage implements IStorage {
     console.log('Attempting to create user in Supabase...');
     console.log('User data to insert:', userData);
     
+    // First, let's verify the table exists and we can access it
+    try {
+      console.log('Testing table access...');
+      const { data: testData, error: testError } = await this.client
+        .from('users')
+        .select('id')
+        .limit(1);
+      
+      if (testError) {
+        console.error('Table access test failed:', testError);
+        throw new Error(`Users table not accessible: ${testError.message}`);
+      }
+      
+      console.log('Table access successful, proceeding with user creation');
+    } catch (error) {
+      console.error('Table access verification failed:', error);
+      throw error;
+    }
+    
     try {
       // Map the fields to match the database schema exactly
       const dbUserData = {
@@ -109,7 +128,7 @@ export class SupabaseStorage implements IStorage {
         last_login_at: userData.lastLoginAt,
       };
 
-      console.log('Mapped DB user data:', dbUserData);
+      console.log('Mapped DB user data:', JSON.stringify(dbUserData, null, 2));
 
       const { data, error } = await this.client
         .from('users')
@@ -117,20 +136,30 @@ export class SupabaseStorage implements IStorage {
         .select()
         .single();
       
+      console.log('Insert operation result - Data:', data);
+      console.log('Insert operation result - Error:', error);
+      console.log('Error type:', typeof error);
+      console.log('Error properties:', error ? Object.keys(error) : 'No error object');
+      
       if (error) {
         console.error('Supabase user creation error:', error);
         console.error('Error details:', JSON.stringify(error, null, 2));
-        throw new Error(`Failed to create user: ${error.message || 'Unknown database error'}`);
+        console.error('Error message:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Error hint:', error.hint);
+        console.error('Error details prop:', error.details);
+        throw new Error(`Failed to create user: ${error.message || error.code || 'Unknown database error'}`);
       }
       
       if (!data) {
-        throw new Error('No data returned from user creation');
+        throw new Error('No data returned from user creation - operation may have failed silently');
       }
       
       console.log('User created successfully in Supabase:', data.id);
       return data;
     } catch (error) {
       console.error('User creation failed:', error);
+      console.error('Full error object:', JSON.stringify(error, null, 2));
       throw error;
     }
   }
