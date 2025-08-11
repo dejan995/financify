@@ -166,10 +166,12 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
       console.log('Supabase fields check:', {
         supabaseUrl: data.supabaseUrl,
         supabaseAnonKey: data.supabaseAnonKey,
-        supabaseServiceKey: data.supabaseServiceKey
+        supabaseServiceKey: data.supabaseServiceKey,
+        supabaseServiceKeyLength: data.supabaseServiceKey?.length || 0
       });
       
-      if (!data.supabaseUrl || !data.supabaseAnonKey || !data.supabaseServiceKey) {
+      if (!data.supabaseUrl || !data.supabaseAnonKey || !data.supabaseServiceKey || 
+          data.supabaseUrl.trim() === '' || data.supabaseAnonKey.trim() === '' || data.supabaseServiceKey.trim() === '') {
         toast({
           title: "Missing Fields",
           description: "Please fill in Supabase URL, Anonymous Key, and Service Role Key",

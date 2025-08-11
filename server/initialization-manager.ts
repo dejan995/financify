@@ -89,10 +89,13 @@ export class InitializationManager {
         console.log('Server received Supabase config:', {
           supabaseUrl: config.supabaseUrl,
           supabaseAnonKey: config.supabaseAnonKey ? 'PROVIDED' : 'MISSING',
-          supabaseServiceKey: config.supabaseServiceKey ? 'PROVIDED' : 'MISSING'
+          supabaseServiceKey: config.supabaseServiceKey ? 'PROVIDED' : 'MISSING',
+          supabaseServiceKeyLength: config.supabaseServiceKey?.length || 0,
+          supabaseServiceKeyValue: config.supabaseServiceKey || 'undefined/empty'
         });
         
-        if (!config.supabaseUrl || !config.supabaseAnonKey || !config.supabaseServiceKey) {
+        if (!config.supabaseUrl || !config.supabaseAnonKey || !config.supabaseServiceKey || 
+            config.supabaseUrl.trim() === '' || config.supabaseAnonKey.trim() === '' || config.supabaseServiceKey.trim() === '') {
           return { success: false, error: 'Supabase URL, Anonymous Key, and Service Role Key are all required' };
         }
         
