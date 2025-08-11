@@ -31,6 +31,41 @@ export class SupabaseStorage implements IStorage {
     this.client = initializeSupabaseClient(supabaseUrl, supabaseAnonKey);
   }
 
+  // Initialize database schema
+  async initializeSchema(): Promise<void> {
+    try {
+      // Check if tables exist by trying to query them
+      const { error: usersError } = await this.client.from('users').select('count').limit(1);
+      
+      if (usersError && usersError.code === '42P01') {
+        // Table doesn't exist, create schema
+        await this.createSchema();
+      }
+    } catch (error) {
+      console.log('Schema check failed, creating new schema:', error);
+      await this.createSchema();
+    }
+  }
+
+  private async createSchema(): Promise<void> {
+    // For Supabase, we need to provide clear instructions to the user
+    const instructions = \`
+SUPABASE SETUP REQUIRED:
+
+The database tables don't exist yet. Please follow these steps:
+
+1. Open your Supabase project dashboard
+2. Go to the SQL Editor tab
+3. Copy and paste the SQL schema from: server/supabase-schema.sql
+4. Click "Run" to create all the required tables
+5. Return here and try the setup again
+
+The schema file contains all the necessary tables for the Personal Finance Tracker application.
+    \`;
+    
+    throw new Error(instructions);
+  }
+
   // User operations
   async getUserCount(): Promise<number> {
     const { count, error } = await this.client

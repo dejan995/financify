@@ -158,6 +158,16 @@ export class InitializationManager {
         // Initialize Supabase storage
         const { SupabaseStorage } = await import('./supabase-storage');
         storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!);
+        
+        // Initialize schema
+        try {
+          await storage.initializeSchema();
+        } catch (error) {
+          return {
+            success: false,
+            error: `Supabase schema initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          };
+        }
       } else {
         // For external databases, add configuration and use it
         dbConfigResult = await this.databaseManager.addDatabaseConfig({
