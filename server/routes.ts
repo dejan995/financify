@@ -5,7 +5,7 @@ import { setupAuth, requireAuth, requireAdmin, AuthService } from "./customAuth"
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
-  insertUserSchema, insertSystemConfigSchema, insertActivityLogSchema
+  insertUserSchema, updateUserSchema, insertSystemConfigSchema, insertActivityLogSchema
 } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -437,14 +437,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/admin/users/:id", requireAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const updates = insertUserSchema.partial().parse(req.body);
-      const user = await storage.updateUser(id, updates);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
+      const updates = updateUserSchema.parse(req.body);
+      
+      // If password is provided, hash it
+      if (updates.password) {
+        const { password, ...otherUpdates } = updates;
+        const hashedPassword = await AuthService.hashPassword(password);
+        const finalUpdates = {
+          ...otherUpdates,
+          passwordHash: hashedPassword
+        };
+        const user = await storage.updateUser(id, finalUpdates);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        const { passwordHash, ...safeUser } = user;
+        res.json(safeUser);
+      } else {
+        // No password update, just update other fields
+        const { password, ...finalUpdates } = updates;
+        const user = await storage.updateUser(id, finalUpdates);
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        const { passwordHash, ...safeUser } = user;
+        res.json(safeUser);
       }
-      // Remove password hash from response
-      const { passwordHash, ...safeUser } = user;
-      res.json(safeUser);
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ message: "Failed to update user" });

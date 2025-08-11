@@ -160,6 +160,19 @@ export const loginUserSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const updateUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  passwordHash: true,
+  emailVerificationToken: true,
+  passwordResetToken: true,
+  passwordResetExpires: true,
+  lastLoginAt: true,
+}).extend({
+  password: z.string().min(8, "Password must be at least 8 characters").max(100, "Password is too long").optional(),
+}).partial();
+
 export const registerUserSchema = insertUserSchema.extend({
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
