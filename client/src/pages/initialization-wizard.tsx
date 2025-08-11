@@ -80,7 +80,14 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
   // Test database connection mutation
   const testConnectionMutation = useMutation({
     mutationFn: async (data: DatabaseSetupForm) => {
-      return apiRequest("POST", "/api/initialization/test-database", data);
+      const response = await fetch("/api/initialization/test-database", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      return response.json();
     },
   });
 
@@ -133,10 +140,11 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     
     try {
       const result = await testConnectionMutation.mutateAsync(data);
-      setConnectionTestResult(result as { success: boolean; error?: string });
+      console.log("Test connection result:", result); // Debug log
+      setConnectionTestResult(result);
       setHasTestedConnection(true);
       
-      if ((result as { success: boolean; error?: string }).success) {
+      if (result.success) {
         toast({
           title: "Connection Successful",
           description: "Database connection test passed!",
@@ -144,7 +152,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
       } else {
         toast({
           title: "Connection Failed",
-          description: (result as { success: boolean; error?: string }).error || "Failed to connect to database",
+          description: result.error || "Failed to connect to database",
           variant: "destructive",
         });
       }
