@@ -40,6 +40,15 @@ const databaseSetupSchema = z.object({
   supabaseUrl: z.string().optional(),
   supabaseAnonKey: z.string().optional(),
   supabaseServiceKey: z.string().optional(),
+}).refine((data) => {
+  // Require Supabase fields when Supabase is selected
+  if (data.provider === 'supabase') {
+    return data.supabaseUrl && data.supabaseAnonKey && data.supabaseServiceKey;
+  }
+  return true;
+}, {
+  message: "Supabase URL, Anonymous Key, and Service Role Key are required for Supabase",
+  path: ["supabaseUrl"],
 });
 
 type AdminSetupForm = z.infer<typeof adminSetupSchema>;
@@ -153,10 +162,10 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     
     // Validate required fields for Supabase
     if (data.provider === 'supabase') {
-      if (!data.supabaseUrl || !data.supabaseAnonKey) {
+      if (!data.supabaseUrl || !data.supabaseAnonKey || !data.supabaseServiceKey) {
         toast({
           title: "Missing Fields",
-          description: "Please fill in both Supabase URL and Anonymous Key",
+          description: "Please fill in Supabase URL, Anonymous Key, and Service Role Key",
           variant: "destructive",
         });
         return;
