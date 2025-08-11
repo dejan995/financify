@@ -90,9 +90,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Initialization error:", error);
+      console.error("Error details:", JSON.stringify(error, null, 2));
       res.status(500).json({
         message: "Initialization failed",
-        error: error instanceof Error ? error.message : "Unknown error"
+        error: error instanceof Error ? error.message : "Unknown error",
+        details: error
       });
     }
   });

@@ -49,19 +49,14 @@ export class SupabaseStorage implements IStorage {
 
   private async createSchema(): Promise<void> {
     // For Supabase, we need to provide clear instructions to the user
-    const instructions = \`
-SUPABASE SETUP REQUIRED:
-
-The database tables don't exist yet. Please follow these steps:
-
-1. Open your Supabase project dashboard
-2. Go to the SQL Editor tab
-3. Copy and paste the SQL schema from: server/supabase-schema.sql
-4. Click "Run" to create all the required tables
-5. Return here and try the setup again
-
-The schema file contains all the necessary tables for the Personal Finance Tracker application.
-    \`;
+    const instructions = "SUPABASE SETUP REQUIRED:\n\n" +
+      "The database tables don't exist yet. Please follow these steps:\n\n" +
+      "1. Open your Supabase project dashboard\n" +
+      "2. Go to the SQL Editor tab\n" +
+      "3. Copy and paste the SQL schema from: server/supabase-schema.sql\n" +
+      "4. Click 'Run' to create all the required tables\n" +
+      "5. Return here and try the setup again\n\n" +
+      "The schema file contains all the necessary tables for the Personal Finance Tracker application.";
     
     throw new Error(instructions);
   }

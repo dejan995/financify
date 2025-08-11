@@ -163,6 +163,7 @@ export class InitializationManager {
         try {
           await storage.initializeSchema();
         } catch (error) {
+          console.error('Schema initialization error:', error);
           return {
             success: false,
             error: `Supabase schema initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -224,6 +225,11 @@ export class InitializationManager {
 
       writeFileSync(this.configPath, JSON.stringify(initConfig, null, 2));
 
+      console.log('Initialization successful:', {
+        adminUserId: adminUser.id,
+        provider: databaseConfig.provider
+      });
+
       return {
         success: true,
         adminUser: {
@@ -238,7 +244,8 @@ export class InitializationManager {
         },
       };
     } catch (error) {
-      console.error('Initialization failed:', error);
+      console.error('Full initialization error:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown initialization error'
