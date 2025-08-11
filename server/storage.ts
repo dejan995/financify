@@ -750,7 +750,7 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
 
   // Check if app is initialized and restore the configured database
   if (initializationManager.isInitialized()) {
-    const config = initializationManager.getConfig();
+    const config = initializationManager.getInitializationStatus();
     console.log('App is initialized, restoring database configuration...');
     
     if (config.database?.provider === 'sqlite') {
@@ -762,9 +762,9 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
       
       try {
         // Load database configuration from saved files  
-        const dbConfigManager = await import('./database-config-manager');
-        const dbConfigs = await dbConfigManager.databaseConfigManager.getAllConfigs();
-        const supabaseConfig = dbConfigs.find(cfg => cfg.provider === 'supabase');
+        const { databaseConfigManager } = await import('./database-config-manager');
+        const dbConfigs = await databaseConfigManager.getAllConfigs();
+        const supabaseConfig = dbConfigs.find((cfg: any) => cfg.provider === 'supabase');
         
         if (supabaseConfig) {
           console.log('Found Supabase credentials, initializing storage...');
@@ -820,9 +820,9 @@ class StorageProxy implements IStorage {
           const config = initializationManager.getInitializationStatus();
           if (config.database?.provider === 'supabase') {
             console.log('[StorageProxy] Loading Supabase credentials...');
-            const dbConfigManager = await import('./database-config-manager');
+            const { databaseConfigManager } = await import('./database-config-manager');
             const dbConfigs = await databaseConfigManager.getAllConfigs();
-            const supabaseConfig = dbConfigs.find(cfg => cfg.provider === 'supabase');
+            const supabaseConfig = dbConfigs.find((cfg: any) => cfg.provider === 'supabase');
             
             if (supabaseConfig) {
               console.log('[StorageProxy] Found Supabase config, initializing...');

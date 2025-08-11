@@ -1,7 +1,19 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { User, UpsertUser } from '@shared/schema';
+import { IStorage } from './storage';
+import type { 
+  User, UpsertUser,
+  Account, InsertAccount,
+  Category, InsertCategory,
+  Transaction, InsertTransaction,
+  Budget, InsertBudget,
+  Goal, InsertGoal,
+  Bill, InsertBill,
+  Product, InsertProduct,
+  SystemConfig, InsertSystemConfig,
+  ActivityLog, InsertActivityLog
+} from '@shared/schema';
 
-export class SupabaseStorageNew {
+export class SupabaseStorageNew implements IStorage {
   private client: SupabaseClient;
   private serviceClient: SupabaseClient;
   private supabaseUrl: string;
@@ -138,7 +150,7 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
     }
   }
 
-  async getUserByUsername(username: string): Promise<User | null> {
+  async getUserByUsername(username: string): Promise<User | undefined> {
     console.log(`[SupabaseStorage] Looking up user: ${username}`);
     const { data, error } = await this.serviceClient
       .from('users')
@@ -148,12 +160,12 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return null; // No rows found
+        return undefined; // No rows found
       }
       throw new Error(`Failed to get user: ${error.message}`);
     }
 
-    if (!data) return null;
+    if (!data) return undefined;
 
     console.log(`[SupabaseStorage] Raw user data:`, JSON.stringify(data, null, 2));
     console.log(`[SupabaseStorage] is_active value:`, data.is_active, 'type:', typeof data.is_active);
@@ -182,7 +194,7 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
     return transformedUser;
   }
 
-  async getUserByEmail(email: string): Promise<User | null> {
+  async getUserByEmail(email: string): Promise<User | undefined> {
     const { data, error } = await this.serviceClient
       .from('users')
       .select('*')
@@ -191,12 +203,12 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return null; // No rows found
+        return undefined; // No rows found
       }
       throw new Error(`Failed to get user: ${error.message}`);
     }
 
-    if (!data) return null;
+    if (!data) return undefined;
 
     // Transform Supabase data to our User interface
     return {
@@ -293,29 +305,7 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
     return data;
   }
 
-  async deleteUser(id: number): Promise<void> {
-    const { error } = await this.serviceClient
-      .from('users')
-      .delete()
-      .eq('id', id);
 
-    if (error) {
-      throw new Error(`Failed to delete user: ${error.message}`);
-    }
-  }
-
-  async getAllUsers(): Promise<User[]> {
-    const { data, error } = await this.serviceClient
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw new Error(`Failed to get users: ${error.message}`);
-    }
-
-    return data || [];
-  }
 
   async getUserCount(): Promise<number> {
     const { count, error } = await this.serviceClient
@@ -356,6 +346,438 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  // Account methods
+  async getAccounts(userId: number): Promise<Account[]> {
+    const { data, error } = await this.serviceClient.from('accounts').select('*').eq('user_id', userId);
+    if (error) throw new Error(`Failed to get accounts: ${error.message}`);
+    return data || [];
+  }
+
+  async getAccount(id: number): Promise<Account | undefined> {
+    const { data, error } = await this.serviceClient.from('accounts').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get account: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createAccount(account: InsertAccount): Promise<Account> {
+    const { data, error } = await this.serviceClient.from('accounts').insert(account).select().single();
+    if (error) throw new Error(`Failed to create account: ${error.message}`);
+    return data;
+  }
+
+  async updateAccount(id: number, account: Partial<InsertAccount>): Promise<Account | undefined> {
+    const { data, error } = await this.serviceClient.from('accounts').update(account).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update account: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteAccount(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('accounts').delete().eq('id', id);
+    return !error;
+  }
+
+  // Category methods
+  async getCategories(userId: number): Promise<Category[]> {
+    const { data, error } = await this.serviceClient.from('categories').select('*').eq('user_id', userId);
+    if (error) throw new Error(`Failed to get categories: ${error.message}`);
+    return data || [];
+  }
+
+  async getCategory(id: number): Promise<Category | undefined> {
+    const { data, error } = await this.serviceClient.from('categories').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get category: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const { data, error } = await this.serviceClient.from('categories').insert(category).select().single();
+    if (error) throw new Error(`Failed to create category: ${error.message}`);
+    return data;
+  }
+
+  async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined> {
+    const { data, error } = await this.serviceClient.from('categories').update(category).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update category: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteCategory(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('categories').delete().eq('id', id);
+    return !error;
+  }
+
+  // Transaction methods
+  async getTransactions(userId: number, filters?: {
+    accountId?: number;
+    categoryId?: number;
+    startDate?: string;
+    endDate?: string;
+    type?: string;
+  }): Promise<Transaction[]> {
+    let query = this.serviceClient.from('transactions').select('*').eq('user_id', userId);
+    
+    if (filters?.accountId) query = query.eq('account_id', filters.accountId);
+    if (filters?.categoryId) query = query.eq('category_id', filters.categoryId);
+    if (filters?.startDate) query = query.gte('date', filters.startDate);
+    if (filters?.endDate) query = query.lte('date', filters.endDate);
+    if (filters?.type) query = query.eq('type', filters.type);
+
+    const { data, error } = await query;
+    if (error) throw new Error(`Failed to get transactions: ${error.message}`);
+    return data || [];
+  }
+
+  async getTransaction(id: number): Promise<Transaction | undefined> {
+    const { data, error } = await this.serviceClient.from('transactions').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get transaction: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
+    const { data, error } = await this.serviceClient.from('transactions').insert(transaction).select().single();
+    if (error) throw new Error(`Failed to create transaction: ${error.message}`);
+    return data;
+  }
+
+  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const { data, error } = await this.serviceClient.from('transactions').update(transaction).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update transaction: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteTransaction(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('transactions').delete().eq('id', id);
+    return !error;
+  }
+
+  // Budget methods
+  async getBudgets(userId: number): Promise<Budget[]> {
+    const { data, error } = await this.serviceClient.from('budgets').select('*').eq('user_id', userId);
+    if (error) throw new Error(`Failed to get budgets: ${error.message}`);
+    return data || [];
+  }
+
+  async getBudget(id: number): Promise<Budget | undefined> {
+    const { data, error } = await this.serviceClient.from('budgets').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get budget: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createBudget(budget: InsertBudget): Promise<Budget> {
+    const { data, error } = await this.serviceClient.from('budgets').insert(budget).select().single();
+    if (error) throw new Error(`Failed to create budget: ${error.message}`);
+    return data;
+  }
+
+  async updateBudget(id: number, budget: Partial<InsertBudget>): Promise<Budget | undefined> {
+    const { data, error } = await this.serviceClient.from('budgets').update(budget).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update budget: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteBudget(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('budgets').delete().eq('id', id);
+    return !error;
+  }
+
+  // Goal methods
+  async getGoals(userId: number): Promise<Goal[]> {
+    const { data, error } = await this.serviceClient.from('goals').select('*').eq('user_id', userId);
+    if (error) throw new Error(`Failed to get goals: ${error.message}`);
+    return data || [];
+  }
+
+  async getGoal(id: number): Promise<Goal | undefined> {
+    const { data, error } = await this.serviceClient.from('goals').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get goal: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createGoal(goal: InsertGoal): Promise<Goal> {
+    const { data, error } = await this.serviceClient.from('goals').insert(goal).select().single();
+    if (error) throw new Error(`Failed to create goal: ${error.message}`);
+    return data;
+  }
+
+  async updateGoal(id: number, goal: Partial<InsertGoal>): Promise<Goal | undefined> {
+    const { data, error } = await this.serviceClient.from('goals').update(goal).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update goal: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteGoal(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('goals').delete().eq('id', id);
+    return !error;
+  }
+
+  // Bill methods
+  async getBills(userId: number): Promise<Bill[]> {
+    const { data, error } = await this.serviceClient.from('bills').select('*').eq('user_id', userId);
+    if (error) throw new Error(`Failed to get bills: ${error.message}`);
+    return data || [];
+  }
+
+  async getBill(id: number): Promise<Bill | undefined> {
+    const { data, error } = await this.serviceClient.from('bills').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get bill: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createBill(bill: InsertBill): Promise<Bill> {
+    const { data, error } = await this.serviceClient.from('bills').insert(bill).select().single();
+    if (error) throw new Error(`Failed to create bill: ${error.message}`);
+    return data;
+  }
+
+  async updateBill(id: number, bill: Partial<InsertBill>): Promise<Bill | undefined> {
+    const { data, error } = await this.serviceClient.from('bills').update(bill).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update bill: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteBill(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('bills').delete().eq('id', id);
+    return !error;
+  }
+
+  // Product methods
+  async getProducts(): Promise<Product[]> {
+    const { data, error } = await this.serviceClient.from('products').select('*');
+    if (error) throw new Error(`Failed to get products: ${error.message}`);
+    return data || [];
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const { data, error } = await this.serviceClient.from('products').select('*').eq('id', id).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get product: ${error.message}`);
+    return data || undefined;
+  }
+
+  async getProductByBarcode(barcode: string): Promise<Product | undefined> {
+    const { data, error } = await this.serviceClient.from('products').select('*').eq('barcode', barcode).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get product by barcode: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const { data, error } = await this.serviceClient.from('products').insert(product).select().single();
+    if (error) throw new Error(`Failed to create product: ${error.message}`);
+    return data;
+  }
+
+  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    const { data, error } = await this.serviceClient.from('products').update(product).eq('id', id).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update product: ${error.message}`);
+    return data || undefined;
+  }
+
+  async searchProducts(query: string): Promise<Product[]> {
+    const { data, error } = await this.serviceClient.from('products').select('*').ilike('name', `%${query}%`);
+    if (error) throw new Error(`Failed to search products: ${error.message}`);
+    return data || [];
+  }
+
+  // Analytics methods
+  async getAccountBalance(userId: number): Promise<number> {
+    const { data, error } = await this.serviceClient
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', userId);
+    
+    if (error) throw new Error(`Failed to get account balance: ${error.message}`);
+    
+    const balance = (data || []).reduce((total, transaction) => total + parseFloat(transaction.amount), 0);
+    return balance;
+  }
+
+  async getMonthlyIncome(userId: number, month: string): Promise<number> {
+    const { data, error } = await this.serviceClient
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('type', 'income')
+      .gte('date', `${month}-01`)
+      .lt('date', `${month}-31`);
+    
+    if (error) throw new Error(`Failed to get monthly income: ${error.message}`);
+    
+    const income = (data || []).reduce((total, transaction) => total + parseFloat(transaction.amount), 0);
+    return income;
+  }
+
+  async getMonthlyExpenses(userId: number, month: string): Promise<number> {
+    const { data, error } = await this.serviceClient
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('type', 'expense')
+      .gte('date', `${month}-01`)
+      .lt('date', `${month}-31`);
+    
+    if (error) throw new Error(`Failed to get monthly expenses: ${error.message}`);
+    
+    const expenses = (data || []).reduce((total, transaction) => total + Math.abs(parseFloat(transaction.amount)), 0);
+    return expenses;
+  }
+
+  async getCategorySpending(userId: number, startDate: string, endDate: string): Promise<{ categoryId: number; amount: number; categoryName: string }[]> {
+    const { data, error } = await this.serviceClient
+      .from('transactions')
+      .select(`
+        category_id,
+        amount,
+        categories!inner(name)
+      `)
+      .eq('user_id', userId)
+      .eq('type', 'expense')
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    if (error) throw new Error(`Failed to get category spending: ${error.message}`);
+    
+    const spending = (data || []).reduce((acc, transaction) => {
+      const existing = acc.find(item => item.categoryId === transaction.category_id);
+      if (existing) {
+        existing.amount += Math.abs(parseFloat(transaction.amount));
+      } else {
+        acc.push({
+          categoryId: transaction.category_id,
+          amount: Math.abs(parseFloat(transaction.amount)),
+          categoryName: (transaction.categories as any)?.name || 'Unknown'
+        });
+      }
+      return acc;
+    }, [] as { categoryId: number; amount: number; categoryName: string }[]);
+    
+    return spending;
+  }
+
+  // Admin methods
+  async getAllUsers(): Promise<User[]> {
+    const { data, error } = await this.serviceClient.from('users').select('*');
+    if (error) throw new Error(`Failed to get all users: ${error.message}`);
+    return data || [];
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const { error } = await this.serviceClient.from('users').delete().eq('id', id);
+    return !error;
+  }
+
+  async getUserStats(): Promise<{ totalUsers: number; activeUsers: number; adminUsers: number }> {
+    const { data, error } = await this.serviceClient.from('users').select('is_active, role');
+    if (error) throw new Error(`Failed to get user stats: ${error.message}`);
+    
+    const stats = (data || []).reduce((acc, user) => {
+      acc.totalUsers++;
+      if (user.is_active) acc.activeUsers++;
+      if (user.role === 'admin') acc.adminUsers++;
+      return acc;
+    }, { totalUsers: 0, activeUsers: 0, adminUsers: 0 });
+    
+    return stats;
+  }
+
+  // System config methods
+  async getSystemConfigs(category?: string): Promise<SystemConfig[]> {
+    let query = this.serviceClient.from('system_configs').select('*');
+    if (category) query = query.eq('category', category);
+    
+    const { data, error } = await query;
+    if (error) throw new Error(`Failed to get system configs: ${error.message}`);
+    return data || [];
+  }
+
+  async getSystemConfig(key: string): Promise<SystemConfig | undefined> {
+    const { data, error } = await this.serviceClient.from('system_configs').select('*').eq('key', key).single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to get system config: ${error.message}`);
+    return data || undefined;
+  }
+
+  async createSystemConfig(config: InsertSystemConfig): Promise<SystemConfig> {
+    const { data, error } = await this.serviceClient.from('system_configs').insert(config).select().single();
+    if (error) throw new Error(`Failed to create system config: ${error.message}`);
+    return data;
+  }
+
+  async updateSystemConfig(key: string, config: Partial<InsertSystemConfig>): Promise<SystemConfig | undefined> {
+    const { data, error } = await this.serviceClient.from('system_configs').update(config).eq('key', key).select().single();
+    if (error && error.code !== 'PGRST116') throw new Error(`Failed to update system config: ${error.message}`);
+    return data || undefined;
+  }
+
+  async deleteSystemConfig(key: string): Promise<boolean> {
+    const { error } = await this.serviceClient.from('system_configs').delete().eq('key', key);
+    return !error;
+  }
+
+  // Activity log methods
+  async getActivityLogs(filters?: { userId?: number; action?: string; resource?: string; limit?: number }): Promise<ActivityLog[]> {
+    let query = this.serviceClient.from('activity_logs').select('*');
+    
+    if (filters?.userId) query = query.eq('user_id', filters.userId);
+    if (filters?.action) query = query.eq('action', filters.action);
+    if (filters?.resource) query = query.eq('resource', filters.resource);
+    if (filters?.limit) query = query.limit(filters.limit);
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw new Error(`Failed to get activity logs: ${error.message}`);
+    return data || [];
+  }
+
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const { data, error } = await this.serviceClient.from('activity_logs').insert(log).select().single();
+    if (error) throw new Error(`Failed to create activity log: ${error.message}`);
+    return data;
+  }
+
+  async deleteActivityLogs(olderThanDays: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+    
+    const { count, error } = await this.serviceClient
+      .from('activity_logs')
+      .delete({ count: 'exact' })
+      .lt('created_at', cutoffDate.toISOString());
+    
+    if (error) throw new Error(`Failed to delete activity logs: ${error.message}`);
+    return count || 0;
+  }
+
+  // System stats method
+  async getSystemStats(): Promise<{
+    totalTransactions: number;
+    totalAccounts: number;
+    totalCategories: number;
+    totalProducts: number;
+    systemHealth: string;
+  }> {
+    try {
+      const [transactions, accounts, categories, products] = await Promise.all([
+        this.serviceClient.from('transactions').select('id', { count: 'exact', head: true }),
+        this.serviceClient.from('accounts').select('id', { count: 'exact', head: true }),
+        this.serviceClient.from('categories').select('id', { count: 'exact', head: true }),
+        this.serviceClient.from('products').select('id', { count: 'exact', head: true })
+      ]);
+
+      return {
+        totalTransactions: transactions.count || 0,
+        totalAccounts: accounts.count || 0,
+        totalCategories: categories.count || 0,
+        totalProducts: products.count || 0,
+        systemHealth: 'healthy'
+      };
+    } catch (error) {
+      return {
+        totalTransactions: 0,
+        totalAccounts: 0,
+        totalCategories: 0,
+        totalProducts: 0,
+        systemHealth: 'error'
       };
     }
   }
