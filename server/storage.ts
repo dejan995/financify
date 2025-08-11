@@ -841,6 +841,15 @@ class StorageProxy implements IStorage {
                 supabaseConfig.supabaseAnonKey!,
                 supabaseConfig.supabaseServiceKey!
               );
+              
+              // Initialize schema to create tables if they don't exist
+              try {
+                await storageInstance.initializeSchema();
+                console.log('[StorageProxy] ✓ Supabase schema initialization completed');
+              } catch (error) {
+                console.error('[StorageProxy] Schema initialization failed:', error);
+              }
+              
               console.log('[StorageProxy] ✓ Supabase storage successfully restored');
             } else {
               console.log('[StorageProxy] No Supabase config found, using memory storage');
