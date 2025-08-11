@@ -72,6 +72,17 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
   const selectedProvider = databaseForm.watch("provider");
   const providerInfo = databaseProviderInfo[selectedProvider];
 
+  // Test database connection mutation
+  const testConnectionMutation = useMutation({
+    mutationFn: async (data: DatabaseSetupForm) => {
+      return apiRequest("/api/initialization/test-database", {
+        method: "POST",
+        body: data,
+      });
+    },
+  });
+
+  // Initialize application mutation
   const initializationMutation = useMutation({
     mutationFn: async (data: { admin: AdminSetupForm; database: DatabaseSetupForm }) => {
       const response = await apiRequest("POST", "/api/initialization", data);
@@ -93,13 +104,60 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     },
   });
 
+  const [connectionTestResult, setConnectionTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [hasTestedConnection, setHasTestedConnection] = useState(false);
+
   const handleAdminSubmit = (data: AdminSetupForm) => {
     setAdminData(data);
     setCurrentStep(2);
   };
 
+  const handleTestConnection = async () => {
+    const data = databaseForm.getValues();
+    setHasTestedConnection(false);
+    setConnectionTestResult(null);
+    
+    try {
+      const result = await testConnectionMutation.mutateAsync(data);
+      setConnectionTestResult(result);
+      setHasTestedConnection(true);
+      
+      if (result.success) {
+        toast({
+          title: "Connection Successful",
+          description: "Database connection test passed!",
+        });
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "Failed to connect to database",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      const errorResult = { success: false, error: error.message || "Connection test failed" };
+      setConnectionTestResult(errorResult);
+      setHasTestedConnection(true);
+      toast({
+        title: "Connection Failed",
+        description: errorResult.error,
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDatabaseSubmit = (data: DatabaseSetupForm) => {
     if (adminData) {
+      // For non-SQLite providers, require successful connection test
+      if (data.provider !== 'sqlite' && (!hasTestedConnection || !connectionTestResult?.success)) {
+        toast({
+          title: "Connection Test Required",
+          description: "Please test your database connection before proceeding",
+          variant: "destructive",
+        });
+        return;
+      }
+
       initializationMutation.mutate({
         admin: adminData,
         database: data,

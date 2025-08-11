@@ -10,104 +10,78 @@ import {
 import { databaseManager } from "./database-manager";
 import { insertDatabaseConfigSchema } from "@shared/database-config";
 import { initializationSchema } from "@shared/initialization-config";
+import { initializationManager } from "./initialization-manager";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Check if app is initialized
+  // Check if app is initialized (WordPress-style)
   app.get("/api/initialization/status", async (req, res) => {
     try {
-      // Check if SQLite database exists or database configurations exist
-      const fs = await import('fs');
-      const sqliteExists = fs.existsSync('./data/finance.db');
-      const hasDbConfig = databaseManager.getActiveConnection() !== null;
-      
-      if (sqliteExists || hasDbConfig) {
-        const adminCount = await storage.getUserCount();
-        res.json({ isInitialized: adminCount > 0 });
-      } else {
-        res.json({ isInitialized: false });
-      }
+      const status = initializationManager.getInitializationStatus();
+      res.json(status);
     } catch (error) {
       res.json({ isInitialized: false });
     }
   });
 
-  // Initialize the application
+  // Test database connection (before initialization)
+  app.post("/api/initialization/test-database", async (req, res) => {
+    try {
+      const { provider, host, port, database, username, password, connectionString } = req.body;
+      
+      const result = await initializationManager.testDatabaseConnection({
+        provider,
+        host,
+        port,
+        database,
+        username,
+        password,
+        connectionString,
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Connection test failed' 
+      });
+    }
+  });
+
+  // Initialize the application (WordPress-style)
   app.post("/api/initialization", async (req, res) => {
     try {
       const { admin, database } = initializationSchema.parse(req.body);
 
       // Check if already initialized
-      try {
-        const adminCount = await storage.getUserCount();
-        if (adminCount > 0) {
-          return res.status(400).json({ message: "Application is already initialized" });
-        }
-      } catch (error) {
-        // If getUserCount fails, it means storage isn't initialized yet, which is expected
+      if (initializationManager.isInitialized()) {
+        return res.status(400).json({ message: "Application is already initialized" });
       }
 
-      // Initialize storage based on selected database provider
-      await setStorageFromWizard(database.provider, database);
+      // Initialize the application
+      const result = await initializationManager.initializeApplication(admin, database);
 
-      // Create admin user
-      const hashedPassword = await AuthService.hashPassword(admin.password);
-      const adminUser = await storage.createUser({
-        username: admin.username,
-        email: admin.email,
-        passwordHash: hashedPassword,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-        profileImageUrl: null,
-        role: "admin",
-        isActive: true,
-        isEmailVerified: true,
-        emailVerificationToken: null,
-        passwordResetToken: null,
-        passwordResetExpires: null,
-        lastLoginAt: null,
-      });
-
-      // Create database configuration if not SQLite
-      if (database.provider !== "sqlite") {
-        try {
-          const dbConfig = await databaseManager.addDatabaseConfig({
-            name: database.name,
-            provider: database.provider,
-            host: database.host || "",
-            port: database.port ? parseInt(database.port) : null,
-            database: database.database || "",
-            username: database.username || "",
-            password: database.password || "",
-            connectionString: database.connectionString || "",
-            ssl: true,
-            isActive: false, // Don't activate immediately, let user test first
-          });
-
-          res.json({ 
-            message: `Application initialized successfully with ${database.provider}. Note: Using memory storage temporarily to avoid connectivity issues. Test your database connection in the admin panel to activate external storage.`,
-            admin: { id: adminUser.id, username: adminUser.username },
-            database: { id: dbConfig.id, name: dbConfig.name, provider: dbConfig.provider },
-            warning: "External database configuration saved but not activated. Using memory storage until connection is verified."
-          });
-        } catch (error) {
-          console.error("Database configuration failed:", error);
-          res.json({ 
-            message: `Application initialized successfully. Database configuration for ${database.provider} failed, using memory storage.`,
-            admin: { id: adminUser.id, username: adminUser.username },
-            database: { provider: "memory", name: "Temporary Memory Storage" },
-            error: "Database configuration failed, using memory storage temporarily"
-          });
-        }
+      if (result.success) {
+        // Set storage from the completed initialization
+        await setStorageFromWizard(database.provider, database);
+        
+        res.json({
+          message: "Application initialized successfully",
+          admin: result.adminUser,
+          database: result.database,
+          isInitialized: true
+        });
       } else {
-        res.json({ 
-          message: "Application initialized successfully with SQLite",
-          admin: { id: adminUser.id, username: adminUser.username },
-          database: { provider: "sqlite", name: "SQLite (Default)" }
+        res.status(400).json({
+          message: "Initialization failed",
+          error: result.error
         });
       }
     } catch (error) {
       console.error("Initialization error:", error);
-      res.status(500).json({ message: "Failed to initialize application" });
+      res.status(500).json({
+        message: "Initialization failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 
