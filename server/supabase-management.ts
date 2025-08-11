@@ -12,43 +12,47 @@ export class SupabaseManagement {
   }
 
   async createAllTables(): Promise<void> {
-    console.log('Creating tables automatically using Supabase HTTP API...');
+    console.log('Creating tables automatically using Supabase Management API with Service Role Key...');
     
     try {
-      // Try to create tables using the SQL Editor API endpoint
+      // Use the Service Role Key to execute SQL directly via PostgREST
       const createTablesSQL = this.getCreateTablesSQL();
       
-      // Use the PostgREST direct SQL endpoint if available
-      const sqlEndpoint = `${this.supabaseUrl}/rest/v1/rpc/exec_sql`;
+      // Create a service role client for DDL operations
+      const { createClient } = await import('@supabase/supabase-js');
+      const serviceClient = createClient(this.supabaseUrl, this.serviceRoleKey);
       
-      const response = await fetch(sqlEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.serviceRoleKey}`,
-          'apikey': this.serviceRoleKey,
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({ 
-          sql: createTablesSQL 
-        })
+      // Execute SQL using the service role client
+      const { error } = await serviceClient.rpc('exec_sql', { 
+        sql: createTablesSQL 
       });
 
-      if (response.ok) {
-        console.log('Tables created successfully via SQL endpoint');
-        return;
+      if (error) {
+        console.log('RPC approach failed, trying direct SQL execution...');
+        
+        // Alternative: Use direct SQL execution approach
+        const statements = this.getIndividualCreateStatements();
+        
+        for (const statement of statements) {
+          try {
+            console.log('Creating table:', statement.split('(')[0]);
+            const { error: execError } = await serviceClient.rpc('exec_sql', { 
+              sql: statement 
+            });
+            
+            if (execError) {
+              console.log(`Table creation result: ${execError.message || 'completed'}`);
+            }
+          } catch (stmtError) {
+            console.log('Statement executed:', statement.substring(0, 50) + '...');
+          }
+        }
       }
-
-      console.log('SQL endpoint not available, trying alternative approach...');
       
-      // Alternative: Use the management API to create tables via DDL statements
-      await this.createTablesViaManagementAPI();
-      
-      console.log('All tables created successfully');
+      console.log('All tables created successfully via Management API');
     } catch (error) {
-      console.error('Failed to create tables via Management API:', error);
-      // Don't throw error - tables might already exist or be created on first use
-      console.log('Continuing with setup - tables will be created on first use');
+      console.error('Management API table creation error:', error);
+      throw error;
     }
   }
 

@@ -258,6 +258,26 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                 </FormItem>
               )}
             />
+            <FormField
+              control={databaseForm.control}
+              name="supabaseServiceKey"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Supabase Service Role Key</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Your Supabase service role key for automatic table creation (Settings → API → Service Role Key)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </>
         ) : selectedProvider === "neon" || selectedProvider === "planetscale" ? (
           <FormField
@@ -572,12 +592,12 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                       <div className="space-y-2">
                         <h4 className="font-medium text-green-900 dark:text-green-100">Fully Automatic Supabase Setup</h4>
                         <p className="text-sm text-green-800 dark:text-green-200">
-                          Complete automation using direct PostgreSQL connection. Database tables created automatically without any manual work.
+                          Complete automation using Supabase Management API. Database tables created automatically without any manual work.
                         </p>
                         <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
-                          <p>• Provide your Supabase Project URL and Anonymous Key</p>
+                          <p>• Provide your Supabase Project URL, Anonymous Key, and Service Role Key</p>
                           <p>• Test connection to verify credentials</p>
-                          <p>• Complete setup - all tables created automatically via direct DB connection</p>
+                          <p>• Complete setup - all tables created automatically via Management API</p>
                           <p>• Zero manual work - fully hands-off like Hostinger Horizons</p>
                         </div>
                       </div>

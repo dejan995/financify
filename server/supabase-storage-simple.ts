@@ -9,77 +9,30 @@ export class SupabaseStorage implements IStorage {
   private management: SupabaseManagement;
   private supabaseUrl: string;
   private supabaseAnonKey: string;
+  private supabaseServiceKey: string;
 
-  constructor(supabaseUrl: string, supabaseAnonKey: string) {
+  constructor(supabaseUrl: string, supabaseAnonKey: string, supabaseServiceKey: string) {
     this.supabaseUrl = supabaseUrl;
     this.supabaseAnonKey = supabaseAnonKey;
+    this.supabaseServiceKey = supabaseServiceKey;
     this.client = initializeSupabaseClient(supabaseUrl, supabaseAnonKey);
-    this.management = new SupabaseManagement(this.client, supabaseUrl, supabaseAnonKey);
+    this.management = new SupabaseManagement(this.client, supabaseUrl, supabaseServiceKey);
   }
 
   async initializeSchema(): Promise<void> {
-    console.log('Automatically creating Supabase tables using direct database connection...');
+    console.log('Automatically creating Supabase tables using Management API...');
     
     try {
-      // Use the underlying PostgreSQL connection to create tables directly
-      await this.createTablesDirectly();
-      console.log('All Supabase tables created automatically!');
+      // Use Management API to create all tables automatically
+      await this.management.createAllTables();
+      console.log('All Supabase tables created automatically via Management API!');
     } catch (error) {
-      console.error('Direct table creation failed:', error);
+      console.error('Management API table creation failed:', error);
       throw error;
     }
   }
 
-  private async createTablesDirectly(): Promise<void> {
-    // Extract database URL from Supabase URL
-    const dbUrl = this.extractPostgreSQLUrl();
-    
-    if (!dbUrl) {
-      throw new Error('Could not extract PostgreSQL connection from Supabase URL');
-    }
 
-    console.log('Creating tables using direct PostgreSQL connection...');
-    
-    // Use the @neondatabase/serverless driver to connect directly
-    const { neon } = await import('@neondatabase/serverless');
-    const sql = neon(dbUrl);
-    
-    try {
-      // Create all tables in sequence
-      const createStatements = this.getCreateTableStatements();
-      
-      for (const statement of createStatements) {
-        console.log('Executing:', statement.split('\n')[0] + '...');
-        await sql(statement);
-      }
-      
-      console.log('All tables created successfully via direct connection');
-    } catch (error) {
-      console.error('Direct table creation error:', error);
-      throw error;
-    }
-  }
-
-  private extractPostgreSQLUrl(): string | null {
-    // Convert Supabase URL to direct PostgreSQL connection
-    try {
-      const url = new URL(this.supabaseUrl);
-      const projectRef = url.hostname.split('.')[0];
-      
-      // Construct the direct PostgreSQL URL
-      // Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
-      const dbHost = `db.${projectRef}.supabase.co`;
-      
-      // Extract password from the Anonymous Key (it's encoded in the JWT)
-      // For direct connection, we'll use connection pooling approach
-      const connectionString = `postgresql://postgres.${projectRef}:${this.supabaseAnonKey}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`;
-      
-      return connectionString;
-    } catch (error) {
-      console.error('Failed to extract PostgreSQL URL:', error);
-      return null;
-    }
-  }
 
   private getCreateTableStatements(): string[] {
     return [
@@ -281,25 +234,6 @@ export class SupabaseStorage implements IStorage {
   async createUser(userData: UpsertUser): Promise<User> {
     console.log('Attempting to create user in Supabase...');
     console.log('User data to insert:', userData);
-    
-    // First, let's verify the table exists and we can access it
-    try {
-      console.log('Testing table access...');
-      const { data: testData, error: testError } = await this.client
-        .from('users')
-        .select('id')
-        .limit(1);
-      
-      if (testError) {
-        console.error('Table access test failed:', testError);
-        throw new Error(`Users table not accessible: ${testError.message}`);
-      }
-      
-      console.log('Table access successful, proceeding with user creation');
-    } catch (error) {
-      console.error('Table access verification failed:', error);
-      throw error;
-    }
     
     try {
       // Map the fields to match the database schema exactly

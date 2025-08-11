@@ -157,7 +157,7 @@ export class InitializationManager {
       } else if (databaseConfig.provider === 'supabase') {
         // Initialize Supabase storage
         const { SupabaseStorage } = await import('./supabase-storage-simple');
-        storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!);
+        storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!, databaseConfig.supabaseServiceKey!);
         
         // Initialize Supabase schema automatically in public schema
         try {

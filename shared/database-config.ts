@@ -19,6 +19,7 @@ export const databaseConfigSchema = z.object({
   // Supabase-specific fields
   supabaseUrl: z.string().optional(),
   supabaseAnonKey: z.string().optional(),
+  supabaseServiceKey: z.string().optional(),
   // Traditional database fields
   host: z.string().optional(),
   port: z.string().optional(),
