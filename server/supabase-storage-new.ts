@@ -40,74 +40,77 @@ export class SupabaseStorageNew implements IStorage {
   async initializeSchema(): Promise<void> {
     console.log('Supabase schema initialization - creating all required tables...');
     
-    try {
-      // Try to create tables one by one using direct SQL queries
-      const tables = [
-        { name: 'users', sql: this.getUsersTableSQL() },
-        { name: 'accounts', sql: this.getAccountsTableSQL() },
-        { name: 'categories', sql: this.getCategoriesTableSQL() }, 
-        { name: 'transactions', sql: this.getTransactionsTableSQL() },
-        { name: 'budgets', sql: this.getBudgetsTableSQL() },
-        { name: 'goals', sql: this.getGoalsTableSQL() },
-        { name: 'bills', sql: this.getBillsTableSQL() },
-        { name: 'products', sql: this.getProductsTableSQL() }
-      ];
+    const tables = [
+      { name: 'users', sql: this.getUsersTableSQL() },
+      { name: 'accounts', sql: this.getAccountsTableSQL() },
+      { name: 'categories', sql: this.getCategoriesTableSQL() }, 
+      { name: 'transactions', sql: this.getTransactionsTableSQL() },
+      { name: 'budgets', sql: this.getBudgetsTableSQL() },
+      { name: 'goals', sql: this.getGoalsTableSQL() },
+      { name: 'bills', sql: this.getBillsTableSQL() },
+      { name: 'products', sql: this.getProductsTableSQL() }
+    ];
 
-      for (const table of tables) {
-        try {
-          console.log(`Creating table: ${table.name}`);
+    for (const table of tables) {
+      try {
+        console.log(`Creating table: ${table.name}`);
+        
+        // First try to access the table to see if it exists
+        const { error: testError } = await this.serviceClient
+          .from(table.name)
+          .select('*')
+          .limit(1);
+
+        if (testError && testError.message?.includes('does not exist')) {
+          console.log(`Table ${table.name} doesn't exist, creating...`);
           
-          // Use the service client to execute SQL directly
-          const { error } = await this.serviceClient
-            .from('information_schema.tables')
-            .select('table_name')
-            .eq('table_name', table.name)
-            .eq('table_schema', 'public')
-            .single();
+          // Create table using direct SQL execution
+          const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/exec_sql`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.supabaseServiceKey}`,
+              'apikey': this.supabaseServiceKey,
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ sql: table.sql })
+          });
 
-          // If table doesn't exist, create it using a simple approach
-          if (error?.code === 'PGRST116') {
-            console.log(`Table ${table.name} doesn't exist, creating...`);
+          if (response.ok) {
+            console.log(`✓ Table ${table.name} created successfully`);
             
-            // Use raw SQL execution through Supabase
-            const { error: createError } = await this.serviceClient.rpc('exec_sql', {
-              sql: table.sql
-            });
-
-            if (createError) {
-              console.log(`Alternative approach for ${table.name}...`);
-              // If RPC fails, try using PostgREST's raw SQL functionality
-              const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/exec_sql`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${this.supabaseServiceKey}`,
-                  'apikey': this.supabaseServiceKey
-                },
-                body: JSON.stringify({ sql: table.sql })
-              });
-
-              if (!response.ok) {
-                console.log(`Failed to create table ${table.name}:`, await response.text());
-              } else {
-                console.log(`✓ Table ${table.name} created successfully`);
-              }
+            // Verify creation by testing access again
+            const { error: verifyError } = await this.serviceClient
+              .from(table.name)
+              .select('*')
+              .limit(1);
+              
+            if (verifyError) {
+              console.log(`⚠ Table ${table.name} creation verification failed:`, verifyError.message);
             } else {
-              console.log(`✓ Table ${table.name} created successfully`);
+              console.log(`✓ Table ${table.name} verified working`);
             }
           } else {
-            console.log(`✓ Table ${table.name} already exists`);
+            const errorText = await response.text();
+            console.log(`Failed to create table ${table.name}:`, errorText);
+            
+            // If exec_sql doesn't exist, provide manual instructions
+            if (errorText.includes('does not exist') || errorText.includes('function')) {
+              console.log(`\n=== MANUAL TABLE CREATION REQUIRED ===`);
+              console.log(`Go to your Supabase dashboard > SQL Editor and run:`);
+              console.log(table.sql);
+              console.log(`======================================\n`);
+            }
           }
-        } catch (err) {
-          console.log(`Error checking/creating table ${table.name}:`, err);
+        } else {
+          console.log(`✓ Table ${table.name} already exists and accessible`);
         }
+      } catch (err) {
+        console.log(`Error with table ${table.name}:`, err);
       }
-
-      console.log('Supabase schema initialization completed');
-    } catch (error) {
-      console.error('Schema initialization error:', error);
-      // Continue anyway - tables might already exist
     }
+
+    console.log('Supabase schema initialization completed');
   }
 
   private getAllTablesSQL(): string {

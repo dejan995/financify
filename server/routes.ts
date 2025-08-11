@@ -641,29 +641,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const configs = databaseManager.getDatabaseConfigs();
       
-      // Also check if we have an active Supabase configuration from initialization
-      const { databaseConfigManager } = await import('./database-config-manager');
-      const supabaseConfigs = await databaseConfigManager.getAllConfigs();
-      const activeSupabaseConfig = supabaseConfigs.find((cfg: any) => cfg.provider === 'supabase' && cfg.isActive);
-      
-      // If we have an active Supabase config but no database manager config, show the current Supabase setup
-      if (activeSupabaseConfig && configs.length === 0) {
-        res.json([{
-          id: activeSupabaseConfig.id,
-          name: activeSupabaseConfig.name,
-          provider: 'supabase',
-          isActive: true,
-          isConnected: true,
-          connectionString: `supabase://${activeSupabaseConfig.supabaseUrl}`,
-          host: new URL(activeSupabaseConfig.supabaseUrl).hostname,
-          database: 'postgres',
-          lastConnectionTest: new Date(),
-          createdAt: activeSupabaseConfig.createdAt,
-          updatedAt: activeSupabaseConfig.updatedAt,
-        }]);
-      } else {
-        res.json(configs);
+      // Check if we have an active Supabase configuration from initialization
+      try {
+        const { databaseConfigManager } = await import('./database-config-manager');
+        const supabaseConfigs = await databaseConfigManager.getAllConfigs();
+        const activeSupabaseConfig = supabaseConfigs.find((cfg: any) => cfg.provider === 'supabase' && cfg.isActive);
+        
+        // If we have an active Supabase config, show it as the primary database
+        if (activeSupabaseConfig) {
+          const supabaseDbConfig = {
+            id: activeSupabaseConfig.id,
+            name: activeSupabaseConfig.name || 'Supabase Database',
+            provider: 'supabase',
+            isActive: true,
+            isConnected: true,
+            connectionString: `supabase://${activeSupabaseConfig.supabaseUrl}`,
+            host: new URL(activeSupabaseConfig.supabaseUrl).hostname,
+            database: 'postgres',
+            lastConnectionTest: new Date(),
+            createdAt: activeSupabaseConfig.createdAt,
+            updatedAt: activeSupabaseConfig.updatedAt,
+          };
+          
+          // Return Supabase config plus any other configs
+          res.json([supabaseDbConfig, ...configs]);
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking Supabase config:', error);
       }
+      
+      res.json(configs);
     } catch (error) {
       console.error("Error fetching database configs:", error);
       res.status(500).json({ message: "Failed to fetch database configurations" });
