@@ -1,0 +1,14 @@
+{
+  "isInitialized": true,
+  "adminUser": {
+    "id": 6,
+    "username": "dejan",
+    "email": "dejan.petrov95@hotmail.com"
+  },
+  "database": {
+    "provider": "supabase",
+    "name": "Main Database",
+    "configId": "supabase-1754936619402"
+  },
+  "createdAt": "2025-08-11T18:23:40.517Z"
+}
