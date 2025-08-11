@@ -117,6 +117,9 @@ export interface IStorage {
     totalProducts: number;
     systemHealth: string;
   }>;
+
+  // Utility methods
+  getUserCount(): Promise<number>;
 }
 
 export class MemStorage implements IStorage {

@@ -9,8 +9,81 @@ import {
 } from "@shared/schema";
 import { databaseManager } from "./database-manager";
 import { insertDatabaseConfigSchema } from "@shared/database-config";
+import { initializationSchema } from "@shared/initialization-config";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Check if app is initialized
+  app.get("/api/initialization/status", async (req, res) => {
+    try {
+      const adminCount = await storage.getUserCount();
+      res.json({ isInitialized: adminCount > 0 });
+    } catch (error) {
+      res.json({ isInitialized: false });
+    }
+  });
+
+  // Initialize the application
+  app.post("/api/initialization", async (req, res) => {
+    try {
+      const { admin, database } = initializationSchema.parse(req.body);
+
+      // Check if already initialized
+      const adminCount = await storage.getUserCount();
+      if (adminCount > 0) {
+        return res.status(400).json({ message: "Application is already initialized" });
+      }
+
+      // Create admin user
+      const hashedPassword = await AuthService.hashPassword(admin.password);
+      const adminUser = await storage.createUser({
+        username: admin.username,
+        email: admin.email,
+        passwordHash: hashedPassword,
+        firstName: admin.firstName,
+        lastName: admin.lastName,
+        profileImageUrl: null,
+        role: "admin",
+        isActive: true,
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        lastLoginAt: null,
+      });
+
+      // Create database configuration if not SQLite
+      if (database.provider !== "sqlite") {
+        const dbConfig = await databaseManager.addDatabaseConfig({
+          name: database.name,
+          provider: database.provider,
+          host: database.host || "",
+          port: database.port ? parseInt(database.port) : null,
+          database: database.database || "",
+          username: database.username || "",
+          password: database.password || "",
+          connectionString: database.connectionString || "",
+          ssl: true,
+          isActive: false, // Don't activate immediately, let user test first
+        });
+
+        res.json({ 
+          message: "Application initialized successfully",
+          admin: { id: adminUser.id, username: adminUser.username },
+          database: { id: dbConfig.id, name: dbConfig.name, provider: dbConfig.provider }
+        });
+      } else {
+        res.json({ 
+          message: "Application initialized successfully with SQLite",
+          admin: { id: adminUser.id, username: adminUser.username },
+          database: { provider: "sqlite", name: "SQLite (Default)" }
+        });
+      }
+    } catch (error) {
+      console.error("Initialization error:", error);
+      res.status(500).json({ message: "Failed to initialize application" });
+    }
+  });
+
   // Auth middleware
   setupAuth(app);
 

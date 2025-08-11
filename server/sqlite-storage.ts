@@ -720,4 +720,9 @@ export class SQLiteStorage implements IStorage {
       totalSpent: totalSpent[0]?.total || 0
     };
   }
+
+  async getUserCount(): Promise<number> {
+    const result = await this.db.select({ count: sql<number>`count(*)` }).from(schema.users);
+    return result[0]?.count || 0;
+  }
 }
