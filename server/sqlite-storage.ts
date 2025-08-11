@@ -104,49 +104,48 @@ export class SQLiteStorage implements IStorage {
 
           CREATE TABLE IF NOT EXISTS "budgets" (
             "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-            "userId" INTEGER NOT NULL,
-            "categoryId" INTEGER NOT NULL,
-            "name" TEXT NOT NULL,
+            "user_id" INTEGER NOT NULL,
+            "category_id" INTEGER NOT NULL,
             "amount" REAL NOT NULL,
             "spent" REAL NOT NULL DEFAULT 0,
             "period" TEXT NOT NULL,
-            "startDate" TEXT NOT NULL,
-            "endDate" TEXT NOT NULL,
-            "isActive" INTEGER NOT NULL DEFAULT 1,
-            "createdAt" TEXT NOT NULL,
-            FOREIGN KEY ("userId") REFERENCES "users" ("id"),
-            FOREIGN KEY ("categoryId") REFERENCES "categories" ("id")
+            "start_date" TEXT NOT NULL,
+            "end_date" TEXT NOT NULL,
+            "is_active" INTEGER NOT NULL DEFAULT 1,
+            "created_at" TEXT NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users" ("id"),
+            FOREIGN KEY ("category_id") REFERENCES "categories" ("id")
           );
 
           CREATE TABLE IF NOT EXISTS "goals" (
             "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-            "userId" INTEGER NOT NULL,
+            "user_id" INTEGER NOT NULL,
             "name" TEXT NOT NULL,
             "description" TEXT,
-            "targetAmount" REAL NOT NULL,
-            "currentAmount" REAL NOT NULL DEFAULT 0,
-            "targetDate" TEXT,
+            "target_amount" REAL NOT NULL,
+            "current_amount" REAL NOT NULL DEFAULT 0,
+            "target_date" TEXT,
             "category" TEXT NOT NULL,
-            "isActive" INTEGER NOT NULL DEFAULT 1,
-            "createdAt" TEXT NOT NULL,
-            FOREIGN KEY ("userId") REFERENCES "users" ("id")
+            "is_active" INTEGER NOT NULL DEFAULT 1,
+            "created_at" TEXT NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users" ("id")
           );
 
           CREATE TABLE IF NOT EXISTS "bills" (
             "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-            "userId" INTEGER NOT NULL,
+            "user_id" INTEGER NOT NULL,
             "name" TEXT NOT NULL,
             "amount" REAL NOT NULL,
-            "dueDate" TEXT NOT NULL,
+            "due_date" TEXT NOT NULL,
             "frequency" TEXT NOT NULL,
-            "categoryId" INTEGER NOT NULL,
-            "accountId" INTEGER,
-            "isPaid" INTEGER NOT NULL DEFAULT 0,
-            "isActive" INTEGER NOT NULL DEFAULT 1,
-            "createdAt" TEXT NOT NULL,
-            FOREIGN KEY ("userId") REFERENCES "users" ("id"),
-            FOREIGN KEY ("categoryId") REFERENCES "categories" ("id"),
-            FOREIGN KEY ("accountId") REFERENCES "accounts" ("id")
+            "category_id" INTEGER NOT NULL,
+            "account_id" INTEGER,
+            "is_paid" INTEGER NOT NULL DEFAULT 0,
+            "is_active" INTEGER NOT NULL DEFAULT 1,
+            "created_at" TEXT NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users" ("id"),
+            FOREIGN KEY ("category_id") REFERENCES "categories" ("id"),
+            FOREIGN KEY ("account_id") REFERENCES "accounts" ("id")
           );
 
           CREATE TABLE IF NOT EXISTS "products" (
@@ -155,8 +154,8 @@ export class SQLiteStorage implements IStorage {
             "brand" TEXT,
             "category" TEXT,
             "barcode" TEXT,
-            "averagePrice" REAL,
-            "createdAt" TEXT NOT NULL
+            "average_price" REAL,
+            "created_at" TEXT NOT NULL
           );
 
           CREATE TABLE IF NOT EXISTS "system_configs" (
@@ -164,20 +163,23 @@ export class SQLiteStorage implements IStorage {
             "key" TEXT NOT NULL UNIQUE,
             "value" TEXT NOT NULL,
             "description" TEXT,
-            "updatedAt" TEXT NOT NULL
+            "category" TEXT,
+            "is_public" INTEGER NOT NULL DEFAULT 0,
+            "updated_by" INTEGER NOT NULL,
+            "updated_at" TEXT NOT NULL
           );
 
           CREATE TABLE IF NOT EXISTS "activity_logs" (
             "id" INTEGER PRIMARY KEY AUTOINCREMENT,
-            "userId" INTEGER NOT NULL,
+            "user_id" INTEGER NOT NULL,
             "action" TEXT NOT NULL,
-            "entityType" TEXT NOT NULL,
-            "entityId" INTEGER,
+            "entity_type" TEXT NOT NULL,
+            "entity_id" INTEGER,
             "details" TEXT,
-            "ipAddress" TEXT,
-            "userAgent" TEXT,
-            "createdAt" TEXT NOT NULL,
-            FOREIGN KEY ("userId") REFERENCES "users" ("id")
+            "ip_address" TEXT,
+            "user_agent" TEXT,
+            "created_at" TEXT NOT NULL,
+            FOREIGN KEY ("user_id") REFERENCES "users" ("id")
           );
         `);
 
