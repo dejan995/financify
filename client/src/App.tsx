@@ -17,6 +17,7 @@ import Products from "@/pages/products";
 import Reports from "@/pages/reports";
 import Scanner from "@/pages/scanner";
 import Admin from "@/pages/admin";
+import DatabaseManagement from "@/pages/database-management";
 import AuthPage from "@/pages/auth-page";
 import Sidebar from "@/components/layout/sidebar";
 
@@ -37,6 +38,7 @@ function AuthenticatedApp() {
           <ProtectedRoute path="/reports" component={Reports} />
           <ProtectedRoute path="/scanner" component={Scanner} />
           <ProtectedRoute path="/admin" component={Admin} />
+          <ProtectedRoute path="/admin/databases" component={DatabaseManagement} />
           <Route path="/auth" component={AuthPage} />
           <Route component={NotFound} />
         </Switch>

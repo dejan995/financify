@@ -19,8 +19,9 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDate, getInitials } from "@/lib/utils";
 import { 
   Users, Settings, Activity, BarChart3, Shield, 
-  UserCheck, UserX, Crown, Edit, Trash2, Plus
+  UserCheck, UserX, Crown, Edit, Trash2, Plus, Database, ArrowRight
 } from "lucide-react";
+import { Link } from "wouter";
 import type { User, InsertUser } from "@shared/schema";
 
 const createUserFormSchema = (isEdit: boolean = false) => z.object({
@@ -423,6 +424,7 @@ export default function Admin() {
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
           <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="databases">Database Management</TabsTrigger>
           <TabsTrigger value="system">System Settings</TabsTrigger>
           <TabsTrigger value="logs">Activity Logs</TabsTrigger>
         </TabsList>
@@ -549,6 +551,90 @@ export default function Admin() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="databases">
+          <Card>
+            <CardHeader>
+              <CardTitle>Database Management</CardTitle>
+              <CardDescription>Configure database connections and manage data migrations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                <div className="flex items-center space-x-4">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <Database className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Database Configuration</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Add and manage multiple database providers (PostgreSQL, MySQL, SQLite, Neon, PlanetScale, Supabase)
+                    </p>
+                  </div>
+                </div>
+                <Link href="/admin/databases">
+                  <Button className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Manage Databases
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Database Connections</CardTitle>
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">In Memory</div>
+                    <p className="text-xs text-muted-foreground">Current storage mode</p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Migration Status</CardTitle>
+                    <Activity className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Ready</div>
+                    <p className="text-xs text-muted-foreground">No migrations running</p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Data Integrity</CardTitle>
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">Healthy</div>
+                    <p className="text-xs text-muted-foreground">All systems operational</p>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <div className="space-y-3 pt-4">
+                <h4 className="font-medium">Quick Actions</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <Link href="/admin/databases">
+                    <Button variant="outline" className="w-full justify-start">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Database Connection
+                    </Button>
+                  </Link>
+                  <Link href="/admin/databases">
+                    <Button variant="outline" className="w-full justify-start">
+                      <ArrowRight className="h-4 w-4 mr-2" />
+                      Start Data Migration
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

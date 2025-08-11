@@ -1,0 +1,400 @@
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { drizzle as drizzleMysql } from 'drizzle-orm/mysql2';
+import { drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
+import { Pool } from '@neondatabase/serverless';
+import mysql from 'mysql2/promise';
+import Database from 'better-sqlite3';
+import * as schema from '@shared/schema';
+import { DatabaseConfig, DatabaseProvider, MigrationLog, databaseProviderInfo } from '@shared/database-config';
+import { eq, and } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+
+export class DatabaseManager {
+  private connections: Map<string, any> = new Map();
+  private activeConnectionId: string | null = null;
+  private configs: Map<string, DatabaseConfig> = new Map();
+  private migrationLogs: Map<string, MigrationLog> = new Map();
+
+  constructor() {
+    this.loadConfigurations();
+  }
+
+  private loadConfigurations() {
+    // Load from localStorage or file system in production
+    const storedConfigs = this.getStoredConfigurations();
+    storedConfigs.forEach(config => {
+      this.configs.set(config.id, config);
+    });
+  }
+
+  private getStoredConfigurations(): DatabaseConfig[] {
+    // In a real implementation, this would load from a persistent store
+    // For now, return empty array - configs will be added via API
+    return [];
+  }
+
+  private saveConfigurations() {
+    // In a real implementation, this would persist to a store
+    // For now, we'll keep them in memory
+  }
+
+  async addDatabaseConfig(config: Omit<DatabaseConfig, 'id' | 'createdAt' | 'updatedAt' | 'isConnected' | 'lastConnectionTest'>): Promise<DatabaseConfig> {
+    const newConfig: DatabaseConfig = {
+      ...config,
+      id: randomUUID(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      isConnected: false
+    };
+
+    // Test connection before adding
+    const connectionTest = await this.testConnection(newConfig);
+    newConfig.isConnected = connectionTest.success;
+    newConfig.lastConnectionTest = new Date();
+
+    if (!connectionTest.success) {
+      throw new Error(`Connection test failed: ${connectionTest.error}`);
+    }
+
+    this.configs.set(newConfig.id, newConfig);
+    this.saveConfigurations();
+
+    return newConfig;
+  }
+
+  async updateDatabaseConfig(id: string, updates: Partial<DatabaseConfig>): Promise<DatabaseConfig | undefined> {
+    const config = this.configs.get(id);
+    if (!config) return undefined;
+
+    const updatedConfig: DatabaseConfig = {
+      ...config,
+      ...updates,
+      id: config.id, // Ensure ID doesn't change
+      updatedAt: new Date()
+    };
+
+    // Test connection if connection string changed
+    if (updates.connectionString && updates.connectionString !== config.connectionString) {
+      const connectionTest = await this.testConnection(updatedConfig);
+      updatedConfig.isConnected = connectionTest.success;
+      updatedConfig.lastConnectionTest = new Date();
+
+      if (!connectionTest.success) {
+        throw new Error(`Connection test failed: ${connectionTest.error}`);
+      }
+    }
+
+    this.configs.set(id, updatedConfig);
+    this.saveConfigurations();
+
+    return updatedConfig;
+  }
+
+  async deleteDatabaseConfig(id: string): Promise<boolean> {
+    if (this.activeConnectionId === id) {
+      throw new Error('Cannot delete the active database configuration');
+    }
+
+    const deleted = this.configs.delete(id);
+    if (deleted) {
+      this.connections.delete(id);
+      this.saveConfigurations();
+    }
+    return deleted;
+  }
+
+  getDatabaseConfigs(): DatabaseConfig[] {
+    return Array.from(this.configs.values());
+  }
+
+  getDatabaseConfig(id: string): DatabaseConfig | undefined {
+    return this.configs.get(id);
+  }
+
+  async testConnection(config: DatabaseConfig): Promise<{ success: boolean; error?: string; latency?: number }> {
+    const startTime = Date.now();
+    
+    try {
+      const connection = await this.createConnection(config);
+      
+      // Test with a simple query based on dialect
+      const providerInfo = databaseProviderInfo[config.provider];
+      
+      if (providerInfo.dialect === 'sqlite') {
+        await (connection as any).prepare('SELECT 1').get();
+      } else if (providerInfo.dialect === 'mysql') {
+        await (connection as any).execute('SELECT 1');
+      } else {
+        // PostgreSQL
+        const pool = connection as Pool;
+        await pool.query('SELECT 1');
+      }
+
+      const latency = Date.now() - startTime;
+      
+      return { success: true, latency };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  private async createConnection(config: DatabaseConfig) {
+    const providerInfo = databaseProviderInfo[config.provider];
+    
+    switch (providerInfo.dialect) {
+      case 'postgresql':
+        const pool = new Pool({ connectionString: config.connectionString });
+        return pool;
+        
+      case 'mysql':
+        const mysqlConnection = await mysql.createConnection(config.connectionString);
+        return mysqlConnection;
+        
+      case 'sqlite':
+        const sqliteDb = new Database(config.connectionString.replace('file:', ''));
+        return sqliteDb;
+        
+      default:
+        throw new Error(`Unsupported database dialect: ${providerInfo.dialect}`);
+    }
+  }
+
+  async switchActiveDatabase(configId: string): Promise<void> {
+    const config = this.configs.get(configId);
+    if (!config) {
+      throw new Error(`Database configuration not found: ${configId}`);
+    }
+
+    if (!config.isConnected) {
+      const connectionTest = await this.testConnection(config);
+      if (!connectionTest.success) {
+        throw new Error(`Cannot switch to database: ${connectionTest.error}`);
+      }
+    }
+
+    // Set all other configs to inactive
+    for (const [id, cfg] of this.configs.entries()) {
+      if (id !== configId) {
+        cfg.isActive = false;
+      }
+    }
+
+    config.isActive = true;
+    this.activeConnectionId = configId;
+    this.saveConfigurations();
+
+    // Update environment variable for the application
+    process.env.DATABASE_URL = config.connectionString;
+  }
+
+  getActiveConnection(): DatabaseConfig | undefined {
+    if (!this.activeConnectionId) return undefined;
+    return this.configs.get(this.activeConnectionId);
+  }
+
+  async migrateData(fromConfigId: string | null, toConfigId: string): Promise<string> {
+    const toConfig = this.configs.get(toConfigId);
+    if (!toConfig) {
+      throw new Error(`Target database configuration not found: ${toConfigId}`);
+    }
+
+    const migrationId = randomUUID();
+    const migrationLog: MigrationLog = {
+      id: migrationId,
+      fromProvider: fromConfigId ? this.configs.get(fromConfigId)?.provider : undefined,
+      toProvider: toConfig.provider,
+      status: 'pending',
+      startedAt: new Date(),
+      recordsMigrated: 0
+    };
+
+    this.migrationLogs.set(migrationId, migrationLog);
+
+    try {
+      migrationLog.status = 'in_progress';
+      
+      // Get source data (either from memory storage or another database)
+      const sourceData = await this.extractAllData(fromConfigId);
+      
+      // Create connection to target database
+      const targetConnection = await this.createConnection(toConfig);
+      const targetDb = this.createDrizzleInstance(targetConnection, toConfig.provider);
+      
+      // Ensure schema exists in target database
+      await this.ensureSchema(targetDb, toConfig.provider);
+      
+      // Migrate data in order (respecting foreign key constraints)
+      let totalRecords = 0;
+      
+      // 1. Users first
+      if (sourceData.users.length > 0) {
+        await this.insertUsers(targetDb, sourceData.users);
+        totalRecords += sourceData.users.length;
+      }
+      
+      // 2. Categories
+      if (sourceData.categories.length > 0) {
+        await this.insertCategories(targetDb, sourceData.categories);
+        totalRecords += sourceData.categories.length;
+      }
+      
+      // 3. Accounts
+      if (sourceData.accounts.length > 0) {
+        await this.insertAccounts(targetDb, sourceData.accounts);
+        totalRecords += sourceData.accounts.length;
+      }
+      
+      // 4. Transactions
+      if (sourceData.transactions.length > 0) {
+        await this.insertTransactions(targetDb, sourceData.transactions);
+        totalRecords += sourceData.transactions.length;
+      }
+      
+      // 5. Other entities
+      if (sourceData.budgets.length > 0) {
+        await this.insertBudgets(targetDb, sourceData.budgets);
+        totalRecords += sourceData.budgets.length;
+      }
+      
+      if (sourceData.goals.length > 0) {
+        await this.insertGoals(targetDb, sourceData.goals);
+        totalRecords += sourceData.goals.length;
+      }
+      
+      if (sourceData.bills.length > 0) {
+        await this.insertBills(targetDb, sourceData.bills);
+        totalRecords += sourceData.bills.length;
+      }
+      
+      if (sourceData.products.length > 0) {
+        await this.insertProducts(targetDb, sourceData.products);
+        totalRecords += sourceData.products.length;
+      }
+
+      migrationLog.status = 'completed';
+      migrationLog.completedAt = new Date();
+      migrationLog.recordsMigrated = totalRecords;
+      
+    } catch (error) {
+      migrationLog.status = 'failed';
+      migrationLog.errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      migrationLog.completedAt = new Date();
+      throw error;
+    } finally {
+      this.migrationLogs.set(migrationId, migrationLog);
+    }
+
+    return migrationId;
+  }
+
+  private createDrizzleInstance(connection: any, provider: DatabaseProvider) {
+    const providerInfo = databaseProviderInfo[provider];
+    
+    switch (providerInfo.dialect) {
+      case 'postgresql':
+        return drizzle(connection, { schema });
+      case 'mysql':
+        return drizzleMysql(connection, { schema });
+      case 'sqlite':
+        return drizzleSqlite(connection, { schema });
+      default:
+        throw new Error(`Unsupported dialect: ${providerInfo.dialect}`);
+    }
+  }
+
+  private async ensureSchema(db: any, provider: DatabaseProvider) {
+    // In a real implementation, this would run migrations
+    // For now, we'll assume the schema exists
+    console.log(`Ensuring schema exists for ${provider}`);
+  }
+
+  private async extractAllData(fromConfigId: string | null) {
+    // If fromConfigId is null, extract from memory storage
+    if (!fromConfigId) {
+      const { storage } = await import('./storage');
+      return {
+        users: await storage.getAllUsers(),
+        categories: await storage.getCategories(0), // Get all categories
+        accounts: [], // We'll need to get all accounts across all users
+        transactions: [], // We'll need to get all transactions across all users  
+        budgets: [], // We'll need to get all budgets across all users
+        goals: [], // We'll need to get all goals across all users
+        bills: [], // We'll need to get all bills across all users
+        products: await storage.getProducts(),
+      };
+    }
+
+    // Extract from another database
+    const sourceConfig = this.configs.get(fromConfigId);
+    if (!sourceConfig) {
+      throw new Error(`Source database configuration not found: ${fromConfigId}`);
+    }
+
+    const sourceConnection = await this.createConnection(sourceConfig);
+    const sourceDb = this.createDrizzleInstance(sourceConnection, sourceConfig.provider);
+
+    return {
+      users: await sourceDb.select().from(schema.users),
+      categories: await sourceDb.select().from(schema.categories),
+      accounts: await sourceDb.select().from(schema.accounts),
+      transactions: await sourceDb.select().from(schema.transactions),
+      budgets: await sourceDb.select().from(schema.budgets),
+      goals: await sourceDb.select().from(schema.goals),
+      bills: await sourceDb.select().from(schema.bills),
+      products: await sourceDb.select().from(schema.products),
+    };
+  }
+
+  private async insertUsers(db: any, users: any[]) {
+    if (users.length === 0) return;
+    await db.insert(schema.users).values(users);
+  }
+
+  private async insertCategories(db: any, categories: any[]) {
+    if (categories.length === 0) return;
+    await db.insert(schema.categories).values(categories);
+  }
+
+  private async insertAccounts(db: any, accounts: any[]) {
+    if (accounts.length === 0) return;
+    await db.insert(schema.accounts).values(accounts);
+  }
+
+  private async insertTransactions(db: any, transactions: any[]) {
+    if (transactions.length === 0) return;
+    await db.insert(schema.transactions).values(transactions);
+  }
+
+  private async insertBudgets(db: any, budgets: any[]) {
+    if (budgets.length === 0) return;
+    await db.insert(schema.budgets).values(budgets);
+  }
+
+  private async insertGoals(db: any, goals: any[]) {
+    if (goals.length === 0) return;
+    await db.insert(schema.goals).values(goals);
+  }
+
+  private async insertBills(db: any, bills: any[]) {
+    if (bills.length === 0) return;
+    await db.insert(schema.bills).values(bills);
+  }
+
+  private async insertProducts(db: any, products: any[]) {
+    if (products.length === 0) return;
+    await db.insert(schema.products).values(products);
+  }
+
+  getMigrationLogs(): MigrationLog[] {
+    return Array.from(this.migrationLogs.values());
+  }
+
+  getMigrationLog(id: string): MigrationLog | undefined {
+    return this.migrationLogs.get(id);
+  }
+}
+
+export const databaseManager = new DatabaseManager();

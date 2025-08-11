@@ -7,6 +7,8 @@ import {
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
   insertUserSchema, updateUserSchema, insertSystemConfigSchema, insertActivityLogSchema
 } from "@shared/schema";
+import { databaseManager } from "./database-manager";
+import { insertDatabaseConfigSchema } from "@shared/database-config";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -500,6 +502,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching system stats:", error);
       res.status(500).json({ message: "Failed to fetch system statistics" });
+    }
+  });
+
+  // Database Management Routes
+  app.get("/api/admin/databases", requireAdmin, async (req: any, res) => {
+    try {
+      const configs = databaseManager.getDatabaseConfigs();
+      res.json(configs);
+    } catch (error) {
+      console.error("Error fetching database configs:", error);
+      res.status(500).json({ message: "Failed to fetch database configurations" });
+    }
+  });
+
+  app.post("/api/admin/databases", requireAdmin, async (req: any, res) => {
+    try {
+      const configData = insertDatabaseConfigSchema.parse(req.body);
+      const config = await databaseManager.addDatabaseConfig(configData);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Error adding database config:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to add database configuration" 
+      });
+    }
+  });
+
+  app.put("/api/admin/databases/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      const updates = insertDatabaseConfigSchema.partial().parse(req.body);
+      const config = await databaseManager.updateDatabaseConfig(id, updates);
+      
+      if (!config) {
+        return res.status(404).json({ message: "Database configuration not found" });
+      }
+      
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating database config:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to update database configuration" 
+      });
+    }
+  });
+
+  app.delete("/api/admin/databases/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      const deleted = await databaseManager.deleteDatabaseConfig(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ message: "Database configuration not found" });
+      }
+      
+      res.json({ message: "Database configuration deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting database config:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to delete database configuration" 
+      });
+    }
+  });
+
+  app.post("/api/admin/databases/:id/test", requireAdmin, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      const config = databaseManager.getDatabaseConfig(id);
+      
+      if (!config) {
+        return res.status(404).json({ message: "Database configuration not found" });
+      }
+      
+      const result = await databaseManager.testConnection(config);
+      res.json(result);
+    } catch (error) {
+      console.error("Error testing database connection:", error);
+      res.status(500).json({ message: "Failed to test database connection" });
+    }
+  });
+
+  app.post("/api/admin/databases/:id/activate", requireAdmin, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      await databaseManager.switchActiveDatabase(id);
+      
+      res.json({ message: "Database activated successfully" });
+    } catch (error) {
+      console.error("Error activating database:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to activate database" 
+      });
+    }
+  });
+
+  app.post("/api/admin/databases/migrate", requireAdmin, async (req: any, res) => {
+    try {
+      const { fromConfigId, toConfigId } = req.body;
+      
+      if (!toConfigId) {
+        return res.status(400).json({ message: "Target database configuration is required" });
+      }
+      
+      const migrationId = await databaseManager.migrateData(fromConfigId || null, toConfigId);
+      res.json({ migrationId, message: "Migration started successfully" });
+    } catch (error) {
+      console.error("Error starting migration:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to start data migration" 
+      });
+    }
+  });
+
+  app.get("/api/admin/databases/migrations", requireAdmin, async (req: any, res) => {
+    try {
+      const migrations = databaseManager.getMigrationLogs();
+      res.json(migrations);
+    } catch (error) {
+      console.error("Error fetching migration logs:", error);
+      res.status(500).json({ message: "Failed to fetch migration logs" });
+    }
+  });
+
+  app.get("/api/admin/databases/migrations/:id", requireAdmin, async (req: any, res) => {
+    try {
+      const id = req.params.id;
+      const migration = databaseManager.getMigrationLog(id);
+      
+      if (!migration) {
+        return res.status(404).json({ message: "Migration log not found" });
+      }
+      
+      res.json(migration);
+    } catch (error) {
+      console.error("Error fetching migration log:", error);
+      res.status(500).json({ message: "Failed to fetch migration log" });
     }
   });
 

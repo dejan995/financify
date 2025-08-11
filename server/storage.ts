@@ -688,4 +688,20 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { DatabaseStorage } from './database-storage';
+import { databaseManager } from './database-manager';
+
+// Initialize storage based on active database configuration
+function initializeStorage(): IStorage {
+  const activeConfig = databaseManager.getActiveConnection();
+  
+  if (activeConfig && process.env.DATABASE_URL) {
+    console.log(`Using database storage with ${activeConfig.provider}`);
+    return new DatabaseStorage(activeConfig.connectionString);
+  }
+  
+  console.log('Using in-memory storage');
+  return new MemStorage();
+}
+
+export const storage = initializeStorage();
