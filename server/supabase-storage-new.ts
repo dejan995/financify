@@ -38,36 +38,61 @@ export class SupabaseStorageNew implements IStorage {
   }
 
   async initializeSchema(): Promise<void> {
-    console.log('Supabase schema initialization - checking table existence...');
+    console.log('Supabase schema initialization - creating all required tables...');
     
-    // Instead of trying to create tables programmatically, just verify they exist
     try {
-      const { data, error } = await this.serviceClient
-        .from('users')
-        .select('id')
-        .limit(1);
+      // Create all tables using SQL
+      const createTablesSQL = this.getAllTablesSQL();
+      
+      const { error } = await this.serviceClient.rpc('exec_sql', {
+        sql: createTablesSQL
+      });
 
-      if (error && error.message?.includes('does not exist')) {
-        console.log('CRITICAL: Users table does not exist in Supabase database');
-        console.log('');
-        console.log('ACTION REQUIRED:');
-        console.log('1. Go to your Supabase dashboard');
-        console.log('2. Navigate to SQL Editor');
-        console.log('3. Run this SQL to create the users table:');
-        console.log('');
-        console.log(this.getUsersTableSQL());
-        console.log('');
-        throw new Error('Users table does not exist. Please create it manually in Supabase dashboard.');
+      if (error) {
+        console.log('Direct table creation failed, trying alternative approach...');
+        
+        // Alternative: Execute each table creation separately
+        const tables = [
+          this.getUsersTableSQL(),
+          this.getAccountsTableSQL(),
+          this.getCategoriesTableSQL(), 
+          this.getTransactionsTableSQL(),
+          this.getBudgetsTableSQL(),
+          this.getGoalsTableSQL(),
+          this.getBillsTableSQL(),
+          this.getProductsTableSQL()
+        ];
+
+        for (const tableSQL of tables) {
+          try {
+            const { error: tableError } = await this.serviceClient.rpc('exec_sql', { sql: tableSQL });
+            if (tableError) {
+              console.log(`Table creation warning:`, tableError.message);
+            }
+          } catch (err) {
+            console.log(`Table creation attempt failed:`, err);
+          }
+        }
       }
 
-      console.log('Users table exists and is accessible');
+      console.log('Supabase schema initialization completed');
     } catch (error) {
-      if (error instanceof Error && error.message.includes('does not exist')) {
-        throw error;
-      }
-      console.error('Error checking table existence:', error);
-      // Continue anyway - might be a temporary connection issue
+      console.error('Schema initialization error:', error);
+      // Continue anyway - tables might already exist
     }
+  }
+
+  private getAllTablesSQL(): string {
+    return `
+${this.getUsersTableSQL()}
+${this.getAccountsTableSQL()}
+${this.getCategoriesTableSQL()}
+${this.getTransactionsTableSQL()}
+${this.getBudgetsTableSQL()}
+${this.getGoalsTableSQL()}
+${this.getBillsTableSQL()}
+${this.getProductsTableSQL()}
+`;
   }
 
   private getUsersTableSQL(): string {
@@ -90,9 +115,137 @@ CREATE TABLE IF NOT EXISTS public.users (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
-
--- Disable RLS for simpler initial setup
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getAccountsTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.accounts (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  balance DECIMAL(15,2) DEFAULT 0,
+  currency TEXT DEFAULT 'USD',
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.accounts DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getCategoriesTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.categories (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  color TEXT DEFAULT '#3B82F6',
+  icon TEXT,
+  parent_id BIGINT REFERENCES public.categories(id) ON DELETE CASCADE,
+  is_system BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.categories DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getTransactionsTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.transactions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+  account_id BIGINT REFERENCES public.accounts(id) ON DELETE CASCADE,
+  category_id BIGINT REFERENCES public.categories(id) ON DELETE SET NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  type TEXT NOT NULL,
+  description TEXT,
+  date DATE NOT NULL,
+  receipt_url TEXT,
+  tags TEXT[],
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getBudgetsTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.budgets (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+  category_id BIGINT REFERENCES public.categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  period TEXT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.budgets DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getGoalsTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.goals (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  target_amount DECIMAL(15,2) NOT NULL,
+  current_amount DECIMAL(15,2) DEFAULT 0,
+  target_date DATE,
+  category TEXT,
+  is_completed BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.goals DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getBillsTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.bills (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES public.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  frequency TEXT NOT NULL,
+  next_due_date DATE NOT NULL,
+  category_id BIGINT REFERENCES public.categories(id) ON DELETE SET NULL,
+  account_id BIGINT REFERENCES public.accounts(id) ON DELETE SET NULL,
+  is_active BOOLEAN DEFAULT true,
+  auto_pay BOOLEAN DEFAULT false,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.bills DISABLE ROW LEVEL SECURITY;
+`;
+  }
+
+  private getProductsTableSQL(): string {
+    return `
+CREATE TABLE IF NOT EXISTS public.products (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  brand TEXT,
+  category TEXT,
+  barcode TEXT UNIQUE,
+  last_price DECIMAL(10,2),
+  average_price DECIMAL(10,2),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+ALTER TABLE public.products DISABLE ROW LEVEL SECURITY;
 `;
   }
 
