@@ -119,6 +119,7 @@ Changelog:
 - August 11, 2025. Created comprehensive initialization wizard for first-time app setup - includes step-by-step admin user creation and database provider selection (SQLite, PostgreSQL, MySQL, Neon, PlanetScale, Supabase) with beautiful UI and form validation
 - August 11, 2025. Restructured database initialization to prevent WebSocket connectivity issues - app now uses memory storage for cloud providers until connection is verified, eliminating silent failures and providing proper user feedback
 - August 11, 2025. Implemented WordPress-style initialization wizard with proper database connection testing - users can now test database connections before proceeding, preventing WebSocket failures and providing clear feedback on connectivity issues
+- August 11, 2025. Updated Supabase integration to use standard React process with Project URL and Anonymous Key instead of connection strings - created comprehensive SupabaseStorage implementation, enhanced initialization wizard with proper Supabase field validation, and integrated connection testing to prevent WebSocket issues
 ```
 
 ## User Preferences

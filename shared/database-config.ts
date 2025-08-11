@@ -15,7 +15,16 @@ export const databaseConfigSchema = z.object({
   id: z.string(),
   name: z.string().min(1, "Database name is required"),
   provider: z.enum(supportedDatabaseProviders),
-  connectionString: z.string().min(1, "Connection string is required"),
+  connectionString: z.string().optional(),
+  // Supabase-specific fields
+  supabaseUrl: z.string().optional(),
+  supabaseAnonKey: z.string().optional(),
+  // Traditional database fields
+  host: z.string().optional(),
+  port: z.string().optional(),
+  database: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
   isActive: z.boolean().default(false),
   isConnected: z.boolean().default(false),
   lastConnectionTest: z.date().optional(),
@@ -73,7 +82,8 @@ export const databaseProviderInfo = {
     dialect: "postgresql" as const,
     defaultPort: 5432,
     supportsSsl: true,
-    connectionStringFormat: "postgresql://[user[:password]@][host][:port][/dbname][?param1=value1&...]"
+    connectionStringFormat: "Supabase URL + Anonymous Key",
+    requiresCredentials: ["supabaseUrl", "supabaseAnonKey"] as const
   },
   mysql: {
     name: "MySQL",

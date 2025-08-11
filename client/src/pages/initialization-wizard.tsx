@@ -36,6 +36,9 @@ const databaseSetupSchema = z.object({
   username: z.string().optional(),
   password: z.string().optional(),
   connectionString: z.string().optional(),
+  // Supabase-specific fields
+  supabaseUrl: z.string().optional(),
+  supabaseAnonKey: z.string().optional(),
 });
 
 type AdminSetupForm = z.infer<typeof adminSetupSchema>;
@@ -116,10 +119,10 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     
     try {
       const result = await testConnectionMutation.mutateAsync(data);
-      setConnectionTestResult(result);
+      setConnectionTestResult(result as { success: boolean; error?: string });
       setHasTestedConnection(true);
       
-      if (result.success) {
+      if ((result as { success: boolean; error?: string }).success) {
         toast({
           title: "Connection Successful",
           description: "Database connection test passed!",
@@ -127,7 +130,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
       } else {
         toast({
           title: "Connection Failed",
-          description: result.error || "Failed to connect to database",
+          description: (result as { success: boolean; error?: string }).error || "Failed to connect to database",
           variant: "destructive",
         });
       }
@@ -167,7 +170,51 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
 
     return (
       <div className="space-y-4">
-        {selectedProvider === "neon" || selectedProvider === "planetscale" || selectedProvider === "supabase" ? (
+        {selectedProvider === "supabase" ? (
+          // Supabase-specific fields
+          <>
+            <FormField
+              control={databaseForm.control}
+              name="supabaseUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Supabase Project URL</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="https://your-project.supabase.co"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Your Supabase project URL from the dashboard
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={databaseForm.control}
+              name="supabaseAnonKey"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Supabase Anonymous Key</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Your Supabase anonymous (public) key from the dashboard
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </>
+        ) : selectedProvider === "neon" || selectedProvider === "planetscale" ? (
           <FormField
             control={databaseForm.control}
             name="connectionString"
@@ -177,7 +224,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                 <FormControl>
                   <Input
                     type="text"
-                    placeholder={`${selectedProvider === "neon" ? "postgresql" : selectedProvider === "planetscale" ? "mysql" : "postgresql"}://username:password@host/database`}
+                    placeholder={`${selectedProvider === "neon" ? "postgresql" : "mysql"}://username:password@host/database`}
                     {...field}
                   />
                 </FormControl>

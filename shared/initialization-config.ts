@@ -17,6 +17,8 @@ export const initializationSchema = z.object({
     username: z.string().optional(),
     password: z.string().optional(),
     connectionString: z.string().optional(),
+    supabaseUrl: z.string().optional(),
+    supabaseAnonKey: z.string().optional(),
   }),
 });
 

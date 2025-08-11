@@ -75,6 +75,8 @@ export class InitializationManager {
     username?: string;
     password?: string;
     connectionString?: string;
+    supabaseUrl?: string;
+    supabaseAnonKey?: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
       if (config.provider === 'sqlite') {
@@ -82,22 +84,32 @@ export class InitializationManager {
         return { success: true };
       }
 
+      // Handle Supabase differently
+      if (config.provider === 'supabase') {
+        if (!config.supabaseUrl || !config.supabaseAnonKey) {
+          return { success: false, error: 'Supabase URL and Anonymous Key are required' };
+        }
+        
+        const { testSupabaseConnection } = await import('./supabase-client');
+        return await testSupabaseConnection(config.supabaseUrl, config.supabaseAnonKey);
+      }
+
       // For other providers, test the connection
       const testConfig: Omit<DatabaseConfig, 'id' | 'createdAt' | 'updatedAt' | 'isConnected' | 'lastConnectionTest'> = {
         name: 'Test Connection',
         provider: config.provider,
-        host: config.host || '',
-        port: config.port ? parseInt(config.port) : null,
-        database: config.database || '',
-        username: config.username || '',
-        password: config.password || '',
         connectionString: config.connectionString || '',
+        host: config.host,
+        port: config.port,
+        database: config.database,
+        username: config.username,
+        password: config.password,
         ssl: true,
         isActive: false,
+        maxConnections: 10,
       };
 
-      const result = await this.databaseManager.testConnection(testConfig as DatabaseConfig);
-      return result;
+      return await this.databaseManager.testConnection(testConfig as DatabaseConfig);
     } catch (error) {
       return { 
         success: false, 
@@ -122,6 +134,8 @@ export class InitializationManager {
     username?: string;
     password?: string;
     connectionString?: string;
+    supabaseUrl?: string;
+    supabaseAnonKey?: string;
   }): Promise<{ success: boolean; adminUser?: any; database?: any; error?: string }> {
     try {
       // First, test the database connection
@@ -140,6 +154,10 @@ export class InitializationManager {
       if (databaseConfig.provider === 'sqlite') {
         // Initialize SQLite storage
         storage = new SQLiteStorage('./data/finance.db');
+      } else if (databaseConfig.provider === 'supabase') {
+        // Initialize Supabase storage
+        const { SupabaseStorage } = await import('./supabase-storage');
+        storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!);
       } else {
         // For external databases, add configuration and use it
         dbConfigResult = await this.databaseManager.addDatabaseConfig({

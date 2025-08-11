@@ -26,7 +26,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test database connection (before initialization)
   app.post("/api/initialization/test-database", async (req, res) => {
     try {
-      const { provider, host, port, database, username, password, connectionString } = req.body;
+      const { provider, host, port, database, username, password, connectionString, supabaseUrl, supabaseAnonKey } = req.body;
+      
+      // Validate Supabase fields if provider is supabase
+      if (provider === 'supabase') {
+        if (!supabaseUrl || !supabaseAnonKey) {
+          return res.json({ 
+            success: false, 
+            error: 'Supabase URL and Anonymous Key are required' 
+          });
+        }
+      }
       
       const result = await initializationManager.testDatabaseConnection({
         provider,
@@ -36,6 +46,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username,
         password,
         connectionString,
+        supabaseUrl,
+        supabaseAnonKey,
       });
 
       res.json(result);
