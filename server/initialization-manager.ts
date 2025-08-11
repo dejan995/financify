@@ -268,6 +268,10 @@ export class InitializationManager {
           provider: databaseConfig.provider,
           name: databaseConfig.name,
           configId: dbConfigResult?.id,
+          // Include Supabase configuration for immediate storage switch
+          supabaseUrl: databaseConfig.supabaseUrl,
+          supabaseAnonKey: databaseConfig.supabaseAnonKey,
+          supabaseServiceKey: databaseConfig.supabaseServiceKey,
         },
       };
     } catch (error) {
