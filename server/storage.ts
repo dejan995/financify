@@ -1098,9 +1098,18 @@ export async function setStorageFromWizard(provider: string, config?: any): Prom
   if (provider === 'sqlite') {
     console.log('Setting up SQLite storage from initialization wizard');
     storageInstance = new SQLiteStorage('./data/finance.db');
+  } else if (provider === 'supabase' && config) {
+    console.log('Setting up Supabase storage immediately after successful initialization');
+    const { SupabaseStorageNew } = await import('./supabase-storage-new');
+    storageInstance = new SupabaseStorageNew(
+      config.supabaseUrl,
+      config.supabaseAnonKey,
+      config.supabaseServiceKey
+    );
+    console.log('✓ Successfully switched to Supabase storage - users can now log in with their credentials');
   } else {
     console.log(`Provider ${provider} selected - will remain in memory storage until external database connection is properly configured`);
-    // For cloud providers like Supabase, Neon, etc., keep using memory storage 
+    // For other cloud providers like Neon, etc., keep using memory storage 
     // until the connection is properly tested and working
     // This prevents WebSocket issues and silent failures
     storageInstance = new MemStorage();
