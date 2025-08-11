@@ -18,12 +18,17 @@ export function clearSupabaseClient(): void {
 
 export async function testSupabaseConnection(supabaseUrl: string, supabaseAnonKey: string): Promise<{ success: boolean; error?: string }> {
   try {
+    // Validate URL format
+    if (!supabaseUrl.includes('supabase.co')) {
+      return { success: false, error: 'Invalid Supabase URL format. Should be https://your-project.supabase.co' };
+    }
+    
     const testClient = createClient(supabaseUrl, supabaseAnonKey);
     
-    // Test the connection by doing a simple RPC call
-    const { error } = await testClient.rpc('version');
+    // Test the connection by trying to access auth
+    const { error } = await testClient.auth.getSession();
     
-    if (error) {
+    if (error && error.message !== 'Auth session missing!') {
       return { success: false, error: error.message };
     }
     

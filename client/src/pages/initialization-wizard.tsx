@@ -69,6 +69,8 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     defaultValues: {
       provider: "sqlite",
       name: "Main Database",
+      supabaseUrl: "",
+      supabaseAnonKey: "",
     },
   });
 
@@ -116,6 +118,18 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     const data = databaseForm.getValues();
     setHasTestedConnection(false);
     setConnectionTestResult(null);
+    
+    // Validate required fields for Supabase
+    if (data.provider === 'supabase') {
+      if (!data.supabaseUrl || !data.supabaseAnonKey) {
+        toast({
+          title: "Missing Fields",
+          description: "Please fill in both Supabase URL and Anonymous Key",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     try {
       const result = await testConnectionMutation.mutateAsync(data);
