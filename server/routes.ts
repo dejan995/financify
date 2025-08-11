@@ -26,14 +26,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test database connection (before initialization)
   app.post("/api/initialization/test-database", async (req, res) => {
     try {
-      const { provider, host, port, database, username, password, connectionString, supabaseUrl, supabaseAnonKey } = req.body;
+      const { provider, host, port, database, username, password, connectionString, supabaseUrl, supabaseAnonKey, supabaseServiceKey } = req.body;
       
       // Validate Supabase fields if provider is supabase
       if (provider === 'supabase') {
-        if (!supabaseUrl || !supabaseAnonKey) {
+        if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
           return res.json({ 
             success: false, 
-            error: 'Supabase URL and Anonymous Key are required' 
+            error: 'Supabase URL, Anonymous Key, and Service Role Key are required' 
           });
         }
       }
@@ -48,6 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         connectionString,
         supabaseUrl,
         supabaseAnonKey,
+        supabaseServiceKey,
       });
 
       res.json(result);
