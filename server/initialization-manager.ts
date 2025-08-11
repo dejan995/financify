@@ -77,6 +77,7 @@ export class InitializationManager {
     connectionString?: string;
     supabaseUrl?: string;
     supabaseAnonKey?: string;
+    supabaseServiceKey?: string;
   }): Promise<{ success: boolean; error?: string }> {
     try {
       if (config.provider === 'sqlite') {
@@ -145,6 +146,7 @@ export class InitializationManager {
     connectionString?: string;
     supabaseUrl?: string;
     supabaseAnonKey?: string;
+    supabaseServiceKey?: string;
   }): Promise<{ success: boolean; adminUser?: any; database?: any; error?: string }> {
     try {
       // First, test the database connection
@@ -164,9 +166,9 @@ export class InitializationManager {
         // Initialize SQLite storage
         storage = new SQLiteStorage('./data/finance.db');
       } else if (databaseConfig.provider === 'supabase') {
-        // Initialize Supabase storage
-        const { SupabaseStorage } = await import('./supabase-storage-simple');
-        console.log('Initializing Supabase storage with credentials:');
+        // Initialize new Supabase storage implementation
+        const { SupabaseStorageNew } = await import('./supabase-storage-new');
+        console.log('Initializing new Supabase storage with credentials:');
         console.log('- URL:', databaseConfig.supabaseUrl);
         console.log('- Anon Key provided:', databaseConfig.supabaseAnonKey ? 'Yes' : 'No');
         console.log('- Service Key provided:', databaseConfig.supabaseServiceKey ? 'Yes' : 'No');
@@ -175,15 +177,16 @@ export class InitializationManager {
           throw new Error('Supabase Service Role Key is required for automatic setup');
         }
         
-        storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!, databaseConfig.supabaseServiceKey!);
+        storage = new SupabaseStorageNew(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!, databaseConfig.supabaseServiceKey!);
         
-        // Initialize Supabase schema automatically in public schema
+        // Initialize Supabase schema - new implementation checks table existence
         try {
           await storage.initializeSchema();
-          console.log('Supabase schema initialization completed');
+          console.log('Supabase schema check completed - tables verified');
         } catch (error) {
-          console.warn('Schema initialization warning (proceeding anyway):', error);
-          // Continue setup even if schema creation has issues
+          console.error('Supabase schema check failed:', error);
+          // For new implementation, we fail fast if tables don't exist
+          throw new Error(`Supabase setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       } else {
         // For external databases, add configuration and use it
