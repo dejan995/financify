@@ -157,11 +157,18 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
 
   const handleTestConnection = async () => {
     const data = databaseForm.getValues();
+    console.log('Form data being sent:', data); // Debug log
     setHasTestedConnection(false);
     setConnectionTestResult(null);
     
     // Validate required fields for Supabase
     if (data.provider === 'supabase') {
+      console.log('Supabase fields check:', {
+        supabaseUrl: data.supabaseUrl,
+        supabaseAnonKey: data.supabaseAnonKey,
+        supabaseServiceKey: data.supabaseServiceKey
+      });
+      
       if (!data.supabaseUrl || !data.supabaseAnonKey || !data.supabaseServiceKey) {
         toast({
           title: "Missing Fields",

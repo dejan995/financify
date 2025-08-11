@@ -86,6 +86,12 @@ export class InitializationManager {
 
       // Handle Supabase differently
       if (config.provider === 'supabase') {
+        console.log('Server received Supabase config:', {
+          supabaseUrl: config.supabaseUrl,
+          supabaseAnonKey: config.supabaseAnonKey ? 'PROVIDED' : 'MISSING',
+          supabaseServiceKey: config.supabaseServiceKey ? 'PROVIDED' : 'MISSING'
+        });
+        
         if (!config.supabaseUrl || !config.supabaseAnonKey || !config.supabaseServiceKey) {
           return { success: false, error: 'Supabase URL, Anonymous Key, and Service Role Key are all required' };
         }
