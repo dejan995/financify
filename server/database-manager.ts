@@ -47,13 +47,20 @@ export class DatabaseManager {
       isConnected: false
     };
 
-    // Test connection before adding
-    const connectionTest = await this.testConnection(newConfig);
-    newConfig.isConnected = connectionTest.success;
-    newConfig.lastConnectionTest = new Date();
-
-    if (!connectionTest.success) {
-      throw new Error(`Connection test failed: ${connectionTest.error}`);
+    // Optionally test connection before adding (don't fail if connection test fails)
+    try {
+      const connectionTest = await this.testConnection(newConfig);
+      newConfig.isConnected = connectionTest.success;
+      newConfig.lastConnectionTest = new Date();
+      
+      // Allow saving even if connection test fails - user can fix connection later
+      if (!connectionTest.success) {
+        console.warn(`Warning: Connection test failed for ${newConfig.name}: ${connectionTest.error}`);
+      }
+    } catch (error) {
+      console.warn(`Warning: Could not test connection for ${newConfig.name}:`, error);
+      newConfig.isConnected = false;
+      newConfig.lastConnectionTest = new Date();
     }
 
     this.configs.set(newConfig.id, newConfig);
@@ -115,6 +122,14 @@ export class DatabaseManager {
     const startTime = Date.now();
     
     try {
+      // Validate required fields first
+      if (!config.connectionString) {
+        return {
+          success: false,
+          error: "Connection string is required"
+        };
+      }
+
       const connection = await this.createConnection(config);
       
       // Test with a simple query based on dialect
@@ -134,9 +149,26 @@ export class DatabaseManager {
       
       return { success: true, latency };
     } catch (error) {
+      let errorMessage = "Connection failed";
+      
+      if (error instanceof Error) {
+        // Provide more helpful error messages for common issues
+        if (error.message.includes("WebSocket")) {
+          errorMessage = "WebSocket connection failed. This usually means invalid credentials or network issues.";
+        } else if (error.message.includes("auth")) {
+          errorMessage = "Authentication failed. Please check your credentials.";
+        } else if (error.message.includes("timeout")) {
+          errorMessage = "Connection timeout. Please check your host and port.";
+        } else if (error.message.includes("ENOTFOUND")) {
+          errorMessage = "Host not found. Please check your host address.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+        error: errorMessage
       };
     }
   }
@@ -158,7 +190,7 @@ export class DatabaseManager {
         return sqliteDb;
         
       default:
-        throw new Error(`Unsupported database dialect: ${providerInfo.dialect}`);
+        throw new Error(`Unsupported database dialect: ${(providerInfo as any)?.dialect || 'unknown'}`);
     }
   }
 
@@ -176,7 +208,7 @@ export class DatabaseManager {
     }
 
     // Set all other configs to inactive
-    for (const [id, cfg] of this.configs.entries()) {
+    for (const [id, cfg] of Array.from(this.configs.entries())) {
       if (id !== configId) {
         cfg.isActive = false;
       }
@@ -297,11 +329,11 @@ export class DatabaseManager {
       case 'postgresql':
         return drizzle(connection, { schema });
       case 'mysql':
-        return drizzleMysql(connection, { schema });
+        return drizzleMysql(connection, { schema, mode: 'default' });
       case 'sqlite':
         return drizzleSqlite(connection, { schema });
       default:
-        throw new Error(`Unsupported dialect: ${providerInfo.dialect}`);
+        throw new Error(`Unsupported dialect: ${(providerInfo as any)?.dialect || 'unknown'}`);
     }
   }
 
@@ -337,14 +369,14 @@ export class DatabaseManager {
     const sourceDb = this.createDrizzleInstance(sourceConnection, sourceConfig.provider);
 
     return {
-      users: await sourceDb.select().from(schema.users),
-      categories: await sourceDb.select().from(schema.categories),
-      accounts: await sourceDb.select().from(schema.accounts),
-      transactions: await sourceDb.select().from(schema.transactions),
-      budgets: await sourceDb.select().from(schema.budgets),
-      goals: await sourceDb.select().from(schema.goals),
-      bills: await sourceDb.select().from(schema.bills),
-      products: await sourceDb.select().from(schema.products),
+      users: await (sourceDb as any).select().from(schema.users),
+      categories: await (sourceDb as any).select().from(schema.categories),
+      accounts: await (sourceDb as any).select().from(schema.accounts),
+      transactions: await (sourceDb as any).select().from(schema.transactions),
+      budgets: await (sourceDb as any).select().from(schema.budgets),
+      goals: await (sourceDb as any).select().from(schema.goals),
+      bills: await (sourceDb as any).select().from(schema.bills),
+      products: await (sourceDb as any).select().from(schema.products),
     };
   }
 

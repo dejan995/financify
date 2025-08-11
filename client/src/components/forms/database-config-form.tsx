@@ -91,6 +91,25 @@ export function DatabaseConfigForm({ config, onClose, onSuccess }: DatabaseConfi
     return info?.connectionStringFormat || "Enter connection string";
   };
 
+  const getConnectionStringHelp = (provider: string) => {
+    switch (provider) {
+      case 'neon':
+        return 'Get from Neon Console → Database → Connection Details → Connection string';
+      case 'planetscale':
+        return 'Get from PlanetScale Console → Database → Connect → General → Connection strings';
+      case 'supabase':
+        return 'Get from Supabase Dashboard → Settings → Database → Connection string → URI';
+      case 'postgresql':
+        return 'Format: postgresql://username:password@hostname:port/database';
+      case 'mysql':
+        return 'Format: mysql://username:password@hostname:port/database';
+      case 'sqlite':
+        return 'Format: file:path/to/database.db (local file path)';
+      default:
+        return 'Refer to your provider\'s documentation for connection string format';
+    }
+  };
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
@@ -170,8 +189,8 @@ export function DatabaseConfigForm({ config, onClose, onSuccess }: DatabaseConfi
                       {...field} 
                     />
                   </FormControl>
-                  <FormDescription>
-                    Format: {databaseProviderInfo[selectedProvider as keyof typeof databaseProviderInfo]?.connectionStringFormat}
+                  <FormDescription className="text-xs">
+                    {getConnectionStringHelp(selectedProvider)}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
