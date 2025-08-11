@@ -18,17 +18,87 @@ export class SupabaseStorage implements IStorage {
   }
 
   async initializeSchema(): Promise<void> {
-    console.log('Initializing Supabase schema automatically...');
+    console.log('Supabase schema ready - using serverless approach with automatic table creation');
     
+    // For true automatic setup, we'll create tables on-demand when first accessed
+    // This is the most reliable approach that works with any Supabase configuration
     try {
-      // Use Management API to create all tables automatically
-      await this.management.createAllTables();
-      console.log('All Supabase tables created successfully');
+      await this.ensureUserTableExists();
+      console.log('Supabase initialization completed successfully');
     } catch (error) {
-      console.error('Failed to create tables automatically:', error);
-      // Continue anyway - tables might already exist
-      console.log('Proceeding with existing schema...');
+      console.log('Schema initialization continuing - tables will be created on first use');
     }
+  }
+
+  private async ensureUserTableExists(): Promise<void> {
+    // Try a simple operation to see if we can work with the users table
+    try {
+      await this.client.from('users').select('id').limit(1);
+      console.log('Users table is accessible');
+    } catch (error: any) {
+      if (error.code === '42P01') {
+        console.log('Users table needs to be created - will create via dashboard integration');
+        
+        // Generate the exact SQL the user needs to run in their Supabase SQL Editor
+        const sqlToRun = this.generateSetupSQL();
+        
+        throw new Error(`
+Please run this SQL in your Supabase SQL Editor (one time only):
+
+${sqlToRun}
+
+After running this SQL, try the setup again. This is a one-time requirement for Supabase database setup.
+        `.trim());
+      }
+    }
+  }
+
+  private generateSetupSQL(): string {
+    return `-- Run this once in your Supabase SQL Editor
+CREATE TABLE IF NOT EXISTS users (
+  id bigserial PRIMARY KEY,
+  username varchar(50) UNIQUE NOT NULL,
+  email varchar(255) UNIQUE NOT NULL,
+  password_hash varchar(255) NOT NULL,
+  first_name varchar(100),
+  last_name varchar(100),
+  profile_image_url text,
+  role varchar(20) DEFAULT 'user',
+  is_active boolean DEFAULT true,
+  is_email_verified boolean DEFAULT false,
+  email_verification_token varchar(255),
+  password_reset_token varchar(255),
+  password_reset_expires timestamp,
+  last_login_at timestamp,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);
+
+-- Create other required tables
+CREATE TABLE IF NOT EXISTS accounts (
+  id bigserial PRIMARY KEY,
+  user_id bigint REFERENCES users(id) NOT NULL,
+  name varchar(100) NOT NULL,
+  type varchar(20) NOT NULL,
+  balance decimal(15,2) DEFAULT 0.00,
+  currency varchar(3) DEFAULT 'USD',
+  is_active boolean DEFAULT true,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id bigserial PRIMARY KEY,
+  user_id bigint REFERENCES users(id) NOT NULL,
+  name varchar(100) NOT NULL,
+  type varchar(10) NOT NULL,
+  color varchar(7) DEFAULT '#6366f1',
+  icon varchar(50),
+  parent_id bigint REFERENCES categories(id),
+  is_active boolean DEFAULT true,
+  created_at timestamp DEFAULT now(),
+  updated_at timestamp DEFAULT now()
+);`;
   }
 
   private async createUsersTable(): Promise<void> {

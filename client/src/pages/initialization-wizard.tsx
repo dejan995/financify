@@ -570,15 +570,15 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                         <CheckCircle2 className="w-5 h-5" />
                       </div>
                       <div className="space-y-2">
-                        <h4 className="font-medium text-green-900 dark:text-green-100">Fully Automatic Supabase Setup</h4>
+                        <h4 className="font-medium text-green-900 dark:text-green-100">Smart Supabase Setup</h4>
                         <p className="text-sm text-green-800 dark:text-green-200">
-                          Complete hands-off setup using Supabase Management API. Database tables created automatically during initialization.
+                          Intelligent setup that provides exact SQL when needed. App will guide you through any required one-time setup.
                         </p>
                         <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
                           <p>• Provide your Supabase Project URL and Anonymous Key</p>
                           <p>• Test connection to verify credentials</p>
-                          <p>• Complete setup - all tables created automatically via Management API</p>
-                          <p>• Zero manual work required</p>
+                          <p>• App provides exact SQL if tables need creation</p>
+                          <p>• Streamlined process with clear guidance</p>
                         </div>
                       </div>
                     </div>
