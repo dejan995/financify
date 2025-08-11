@@ -470,7 +470,7 @@ export class DatabaseManager {
 
         // Execute each CREATE TABLE query
         for (const query of createTableQueries) {
-          await db.run(query);
+          db.run(query);
         }
         
         console.log(`Created SQLite schema with ${createTableQueries.length} tables`);
@@ -551,29 +551,58 @@ export class DatabaseManager {
   private async insertUsers(db: any, users: any[]) {
     if (users.length === 0) return;
     
-    // Transform user data to handle date fields for SQLite
-    const transformedUsers = users.map(user => ({
-      ...user,
-      createdAt: user.createdAt ? Math.floor(new Date(user.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: user.updatedAt ? Math.floor(new Date(user.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      lastLoginAt: user.lastLoginAt ? Math.floor(new Date(user.lastLoginAt).getTime() / 1000) : null,
-      passwordResetExpires: user.passwordResetExpires ? Math.floor(new Date(user.passwordResetExpires).getTime() / 1000) : null
-    }));
+    // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+    const stmt = db.prepare(`
+      INSERT INTO users (
+        username, email, password_hash, first_name, last_name, 
+        profile_image_url, role, is_active, is_email_verified,
+        email_verification_token, password_reset_token, password_reset_expires,
+        last_login_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
     
-    await db.insert(schema.users).values(transformedUsers);
+    for (const user of users) {
+      stmt.run(
+        user.username,
+        user.email,
+        user.passwordHash,
+        user.firstName || null,
+        user.lastName || null,
+        user.profileImageUrl || null,
+        user.role || 'user',
+        user.isActive ? 1 : 0,
+        user.isEmailVerified ? 1 : 0,
+        user.emailVerificationToken || null,
+        user.passwordResetToken || null,
+        user.passwordResetExpires ? Math.floor(new Date(user.passwordResetExpires).getTime() / 1000) : null,
+        user.lastLoginAt ? Math.floor(new Date(user.lastLoginAt).getTime() / 1000) : null,
+        user.createdAt ? Math.floor(new Date(user.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+        user.updatedAt ? Math.floor(new Date(user.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+      );
+    }
   }
 
   private async insertCategories(db: any, categories: any[]) {
     if (categories.length === 0) return;
     
-    // Transform category data for SQLite
-    const transformedCategories = categories.map(category => ({
-      ...category,
-      createdAt: category.createdAt ? Math.floor(new Date(category.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: category.updatedAt ? Math.floor(new Date(category.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
+    // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+    const stmt = db.prepare(`
+      INSERT INTO categories (
+        user_id, name, color, type, parent_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
     
-    await db.insert(schema.categories).values(transformedCategories);
+    for (const category of categories) {
+      stmt.run(
+        category.userId,
+        category.name,
+        category.color,
+        category.type || 'expense',
+        category.parentId || null,
+        category.createdAt ? Math.floor(new Date(category.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+        category.updatedAt ? Math.floor(new Date(category.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+      );
+    }
   }
 
   private async insertAccounts(db: any, accounts: any[]) {
@@ -650,14 +679,25 @@ export class DatabaseManager {
   private async insertProducts(db: any, products: any[]) {
     if (products.length === 0) return;
     
-    // Transform product data for SQLite
-    const transformedProducts = products.map(product => ({
-      ...product,
-      createdAt: product.createdAt ? Math.floor(new Date(product.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
-      updatedAt: product.updatedAt ? Math.floor(new Date(product.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
-    }));
+    // For SQLite, use raw SQL to avoid Drizzle type conversion issues
+    const stmt = db.prepare(`
+      INSERT INTO products (
+        name, barcode, category, brand, average_price, currency, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
     
-    await db.insert(schema.products).values(transformedProducts);
+    for (const product of products) {
+      stmt.run(
+        product.name,
+        product.barcode || null,
+        product.category || null,
+        product.brand || null,
+        product.averagePrice || null,
+        product.currency || 'USD',
+        product.createdAt ? Math.floor(new Date(product.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+        product.updatedAt ? Math.floor(new Date(product.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+      );
+    }
   }
 
   getMigrationLogs(): MigrationLog[] {
