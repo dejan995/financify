@@ -89,20 +89,45 @@ export class SupabaseStorage implements IStorage {
 
   async createUser(userData: UpsertUser): Promise<User> {
     console.log('Attempting to create user in Supabase...');
+    console.log('User data to insert:', userData);
     
     try {
+      // Map the fields to match the database schema exactly
+      const dbUserData = {
+        username: userData.username,
+        email: userData.email,
+        password_hash: userData.passwordHash,
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        profile_image_url: userData.profileImageUrl,
+        role: userData.role,
+        is_active: userData.isActive,
+        is_email_verified: userData.isEmailVerified,
+        email_verification_token: userData.emailVerificationToken,
+        password_reset_token: userData.passwordResetToken,
+        password_reset_expires: userData.passwordResetExpires,
+        last_login_at: userData.lastLoginAt,
+      };
+
+      console.log('Mapped DB user data:', dbUserData);
+
       const { data, error } = await this.client
         .from('users')
-        .insert(userData)
+        .insert(dbUserData)
         .select()
         .single();
       
       if (error) {
         console.error('Supabase user creation error:', error);
-        throw new Error(`Failed to create user: ${error.message}`);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw new Error(`Failed to create user: ${error.message || 'Unknown database error'}`);
       }
       
-      console.log('User created successfully in Supabase');
+      if (!data) {
+        throw new Error('No data returned from user creation');
+      }
+      
+      console.log('User created successfully in Supabase:', data.id);
       return data;
     } catch (error) {
       console.error('User creation failed:', error);

@@ -192,7 +192,7 @@ export class InitializationManager {
       const hashedPassword = await AuthService.hashPassword(adminData.password);
       console.log('Password hashed successfully');
       
-      const adminUser = await storage.createUser({
+      const userDataToCreate = {
         username: adminData.username,
         email: adminData.email,
         passwordHash: hashedPassword,
@@ -206,7 +206,10 @@ export class InitializationManager {
         passwordResetToken: null,
         passwordResetExpires: null,
         lastLoginAt: null,
-      } as UpsertUser);
+      } as UpsertUser;
+      
+      console.log('Admin user data prepared:', userDataToCreate);
+      const adminUser = await storage.createUser(userDataToCreate);
       
       console.log('Admin user created successfully:', adminUser.id);
 
