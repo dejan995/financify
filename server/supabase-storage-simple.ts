@@ -15,7 +15,8 @@ export class SupabaseStorage implements IStorage {
     this.supabaseUrl = supabaseUrl;
     this.supabaseAnonKey = supabaseAnonKey;
     this.supabaseServiceKey = supabaseServiceKey;
-    this.client = initializeSupabaseClient(supabaseUrl, supabaseAnonKey);
+    // Use service role key for all operations to ensure proper permissions
+    this.client = initializeSupabaseClient(supabaseUrl, supabaseServiceKey);
     this.management = new SupabaseManagement(this.client, supabaseUrl, supabaseServiceKey);
   }
 
@@ -55,52 +56,19 @@ export class SupabaseStorage implements IStorage {
       .limit(0);
 
     if (error && error.message.includes('does not exist')) {
-      console.log('Users table does not exist - attempting to create it automatically...');
-      
-      try {
-        // Try to create the table using SQL via the service role
-        const createTableSQL = `
-CREATE TABLE IF NOT EXISTS public.users (
-  id bigserial PRIMARY KEY,
-  username varchar(50) UNIQUE NOT NULL,
-  email varchar(255) UNIQUE NOT NULL,
-  password_hash varchar(255) NOT NULL,
-  first_name varchar(100),
-  last_name varchar(100),
-  profile_image_url text,
-  role varchar(20) DEFAULT 'user',
-  is_active boolean DEFAULT true,
-  is_email_verified boolean DEFAULT false,
-  email_verification_token varchar(255),
-  password_reset_token varchar(255),
-  password_reset_expires timestamp,
-  last_login_at timestamp,
-  created_at timestamp DEFAULT now(),
-  updated_at timestamp DEFAULT now()
-);`;
-
-        // Use fetch to call Supabase's SQL runner endpoint
-        const response = await fetch(`${this.supabaseUrl}/rest/v1/rpc/exec`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.supabaseServiceKey}`,
-            'apikey': this.supabaseServiceKey,
-            'Prefer': 'return=representation'
-          },
-          body: JSON.stringify({ sql: createTableSQL })
-        });
-
-        if (response.ok) {
-          console.log('Users table created automatically!');
-        } else {
-          console.log('Automatic table creation failed, but this is normal for Supabase');
-          console.log('The table will be created automatically when you first try to insert data');
-        }
-      } catch (createError) {
-        console.log('Automatic table creation not supported, but this is normal for Supabase');
-        console.log('Tables will be created automatically on first use');
-      }
+      console.log('=================== IMPORTANT ===================');
+      console.log('Users table does not exist in your Supabase database!');
+      console.log('');
+      console.log('REQUIRED ACTION:');
+      console.log('1. Go to your Supabase dashboard');
+      console.log('2. Open the SQL Editor');
+      console.log('3. Copy and run the SQL from supabase-setup.sql file');
+      console.log('4. Try the initialization again');
+      console.log('');
+      console.log('The supabase-setup.sql file contains all necessary');
+      console.log('table creation statements for the finance tracker.');
+      console.log('================================================');
+      throw new Error('Database tables do not exist. Please run supabase-setup.sql in your Supabase SQL Editor first.');
     }
     
     console.log('Users table exists and is accessible');
