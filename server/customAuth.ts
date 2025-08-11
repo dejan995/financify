@@ -75,9 +75,14 @@ export class AuthService {
     try {
       // Check if any users exist - if not, don't create default admin
       // Let the initialization wizard handle this
-      const userCount = await storage.getUserCount();
-      if (userCount === 0) {
-        console.log("No users found - initialization wizard will handle admin creation");
+      try {
+        const userCount = await storage.getUserCount();
+        if (userCount === 0) {
+          console.log("No users found - initialization wizard will handle admin creation");
+          return null;
+        }
+      } catch (error) {
+        console.log("Storage not ready - initialization wizard will handle admin creation");
         return null;
       }
 

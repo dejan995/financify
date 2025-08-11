@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, setStorageFromWizard } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, AuthService } from "./customAuth";
 import { 
   insertAccountSchema, insertCategorySchema, insertTransactionSchema,
@@ -15,8 +15,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check if app is initialized
   app.get("/api/initialization/status", async (req, res) => {
     try {
-      const adminCount = await storage.getUserCount();
-      res.json({ isInitialized: adminCount > 0 });
+      // Check if SQLite database exists or database configurations exist
+      const fs = await import('fs');
+      const sqliteExists = fs.existsSync('./data/finance.db');
+      const hasDbConfig = databaseManager.getActiveConnection() !== null;
+      
+      if (sqliteExists || hasDbConfig) {
+        const adminCount = await storage.getUserCount();
+        res.json({ isInitialized: adminCount > 0 });
+      } else {
+        res.json({ isInitialized: false });
+      }
     } catch (error) {
       res.json({ isInitialized: false });
     }
@@ -28,10 +37,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { admin, database } = initializationSchema.parse(req.body);
 
       // Check if already initialized
-      const adminCount = await storage.getUserCount();
-      if (adminCount > 0) {
-        return res.status(400).json({ message: "Application is already initialized" });
+      try {
+        const adminCount = await storage.getUserCount();
+        if (adminCount > 0) {
+          return res.status(400).json({ message: "Application is already initialized" });
+        }
+      } catch (error) {
+        // If getUserCount fails, it means storage isn't initialized yet, which is expected
       }
+
+      // Initialize storage based on selected database provider
+      await setStorageFromWizard(database.provider, database);
 
       // Create admin user
       const hashedPassword = await AuthService.hashPassword(admin.password);

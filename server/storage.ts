@@ -24,6 +24,7 @@ import {
 // Interface for storage operations
 export interface IStorage {
   // Users
+  getUserCount(): Promise<number>;
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -689,35 +690,410 @@ export class MemStorage implements IStorage {
       systemHealth: "healthy",
     };
   }
+
+  async getUserCount(): Promise<number> {
+    return this.users.size;
+  }
 }
 
 import { DatabaseStorage } from './database-storage';
 import { SQLiteStorage } from './sqlite-storage';
 import { databaseManager } from './database-manager';
+import { existsSync } from 'fs';
 
-// Initialize storage based on environment and active database configuration
-function initializeStorage(): IStorage {
+// Storage instance - will be initialized after wizard completion
+let storageInstance: IStorage | null = null;
+
+// Check if app has been initialized by checking if any storage exists
+function checkInitializationStatus(): boolean {
+  // Check if SQLite database exists
+  if (existsSync('./data/finance.db')) {
+    return true;
+  }
+  
+  // Check if any database configurations exist
+  const activeConfig = databaseManager.getActiveConnection();
+  return activeConfig !== null;
+}
+
+// Initialize storage only after initialization wizard completes
+async function initializeStorage(forceProvider?: string, configPath?: string): Promise<IStorage> {
+  // If storage already exists, return it
+  if (storageInstance) {
+    return storageInstance;
+  }
+
   // Check for explicit memory storage flag
   if (process.env.USE_MEMORY_STORAGE === 'true') {
     console.log('Using in-memory storage');
-    return new MemStorage();
+    storageInstance = new MemStorage();
+    return storageInstance;
   }
 
-  // Force SQLite to avoid WebSocket issues with Neon
+  // Use forced provider if specified (from wizard)
+  if (forceProvider) {
+    if (forceProvider === 'sqlite') {
+      console.log('Initializing SQLite storage from wizard selection');
+      storageInstance = new SQLiteStorage(configPath || './data/finance.db');
+      return storageInstance;
+    }
+  }
+
   // Check for active database configuration from database manager
   const activeConfig = databaseManager.getActiveConnection();
   if (activeConfig && activeConfig.provider !== 'neon') {
     console.log(`Using database storage with ${activeConfig.provider}`);
     if (activeConfig.provider === 'sqlite') {
-      return new SQLiteStorage(activeConfig.connectionString.replace('file:', ''));
+      storageInstance = new SQLiteStorage(activeConfig.connectionString.replace('file:', ''));
     } else if (activeConfig.provider === 'postgresql' && !activeConfig.connectionString.includes('neon')) {
-      return new DatabaseStorage(activeConfig.connectionString);
+      storageInstance = new DatabaseStorage(activeConfig.connectionString);
     }
+    return storageInstance!;
   }
   
-  // Default to SQLite storage (avoid Neon WebSocket issues)
-  console.log('Using SQLite database storage (default - avoiding WebSocket issues)');
-  return new SQLiteStorage('./data/finance.db');
+  // If no configuration exists and no force provider, use memory storage temporarily
+  console.log('No database configuration found - using temporary memory storage until initialization');
+  storageInstance = new MemStorage();
+  return storageInstance;
 }
 
-export const storage = initializeStorage();
+// Create storage proxy that initializes on first use
+class StorageProxy implements IStorage {
+  private async getStorage(): Promise<IStorage> {
+    if (!storageInstance) {
+      if (checkInitializationStatus()) {
+        // App was previously initialized, initialize storage
+        await initializeStorage();
+      } else {
+        // App not initialized yet, use memory storage temporarily
+        storageInstance = new MemStorage();
+      }
+    }
+    return storageInstance!;
+  }
+
+  async getUserCount(): Promise<number> {
+    const storage = await this.getStorage();
+    return storage.getUserCount();
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    const storage = await this.getStorage();
+    return storage.getUser(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const storage = await this.getStorage();
+    return storage.getUserByUsername(username);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const storage = await this.getStorage();
+    return storage.getUserByEmail(email);
+  }
+
+  async createUser(user: UpsertUser): Promise<User> {
+    const storage = await this.getStorage();
+    return storage.createUser(user);
+  }
+
+  async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateUser(id, updates);
+  }
+
+  async getAccounts(userId: number): Promise<Account[]> {
+    const storage = await this.getStorage();
+    return storage.getAccounts(userId);
+  }
+
+  async getAccount(id: number): Promise<Account | undefined> {
+    const storage = await this.getStorage();
+    return storage.getAccount(id);
+  }
+
+  async createAccount(account: InsertAccount): Promise<Account> {
+    const storage = await this.getStorage();
+    return storage.createAccount(account);
+  }
+
+  async updateAccount(id: number, account: Partial<InsertAccount>): Promise<Account | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateAccount(id, account);
+  }
+
+  async deleteAccount(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteAccount(id);
+  }
+
+  async getCategories(userId: number): Promise<Category[]> {
+    const storage = await this.getStorage();
+    return storage.getCategories(userId);
+  }
+
+  async getCategory(id: number): Promise<Category | undefined> {
+    const storage = await this.getStorage();
+    return storage.getCategory(id);
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const storage = await this.getStorage();
+    return storage.createCategory(category);
+  }
+
+  async updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateCategory(id, category);
+  }
+
+  async deleteCategory(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteCategory(id);
+  }
+
+  async getTransactions(userId: number, filters?: {
+    accountId?: number;
+    categoryId?: number;
+    startDate?: string;
+    endDate?: string;
+    type?: string;
+  }): Promise<Transaction[]> {
+    const storage = await this.getStorage();
+    return storage.getTransactions(userId, filters);
+  }
+
+  async getTransaction(id: number): Promise<Transaction | undefined> {
+    const storage = await this.getStorage();
+    return storage.getTransaction(id);
+  }
+
+  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
+    const storage = await this.getStorage();
+    return storage.createTransaction(transaction);
+  }
+
+  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateTransaction(id, transaction);
+  }
+
+  async deleteTransaction(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteTransaction(id);
+  }
+
+  async getBudgets(userId: number): Promise<Budget[]> {
+    const storage = await this.getStorage();
+    return storage.getBudgets(userId);
+  }
+
+  async getBudget(id: number): Promise<Budget | undefined> {
+    const storage = await this.getStorage();
+    return storage.getBudget(id);
+  }
+
+  async createBudget(budget: InsertBudget): Promise<Budget> {
+    const storage = await this.getStorage();
+    return storage.createBudget(budget);
+  }
+
+  async updateBudget(id: number, budget: Partial<InsertBudget>): Promise<Budget | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateBudget(id, budget);
+  }
+
+  async deleteBudget(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteBudget(id);
+  }
+
+  async getGoals(userId: number): Promise<Goal[]> {
+    const storage = await this.getStorage();
+    return storage.getGoals(userId);
+  }
+
+  async getGoal(id: number): Promise<Goal | undefined> {
+    const storage = await this.getStorage();
+    return storage.getGoal(id);
+  }
+
+  async createGoal(goal: InsertGoal): Promise<Goal> {
+    const storage = await this.getStorage();
+    return storage.createGoal(goal);
+  }
+
+  async updateGoal(id: number, goal: Partial<InsertGoal>): Promise<Goal | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateGoal(id, goal);
+  }
+
+  async deleteGoal(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteGoal(id);
+  }
+
+  async getBills(userId: number): Promise<Bill[]> {
+    const storage = await this.getStorage();
+    return storage.getBills(userId);
+  }
+
+  async getBill(id: number): Promise<Bill | undefined> {
+    const storage = await this.getStorage();
+    return storage.getBill(id);
+  }
+
+  async createBill(bill: InsertBill): Promise<Bill> {
+    const storage = await this.getStorage();
+    return storage.createBill(bill);
+  }
+
+  async updateBill(id: number, bill: Partial<InsertBill>): Promise<Bill | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateBill(id, bill);
+  }
+
+  async deleteBill(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteBill(id);
+  }
+
+  async getProducts(filters?: { category?: string; brand?: string; barcode?: string }): Promise<Product[]> {
+    const storage = await this.getStorage();
+    return storage.getProducts(filters);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const storage = await this.getStorage();
+    return storage.getProduct(id);
+  }
+
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const storage = await this.getStorage();
+    return storage.createProduct(product);
+  }
+
+  async updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined> {
+    const storage = await this.getStorage();
+    return storage.updateProduct(id, product);
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteProduct(id);
+  }
+
+  async getSystemConfigs(): Promise<SystemConfig[]> {
+    const storage = await this.getStorage();
+    return storage.getSystemConfigs();
+  }
+
+  async getSystemConfig(key: string): Promise<SystemConfig | undefined> {
+    const storage = await this.getStorage();
+    return storage.getSystemConfig(key);
+  }
+
+  async setSystemConfig(config: InsertSystemConfig): Promise<SystemConfig> {
+    const storage = await this.getStorage();
+    return storage.setSystemConfig(config);
+  }
+
+  async deleteSystemConfig(key: string): Promise<boolean> {
+    const storage = await this.getStorage();
+    return storage.deleteSystemConfig(key);
+  }
+
+  async getActivityLogs(filters?: {
+    userId?: number;
+    action?: string;
+    resource?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+  }): Promise<ActivityLog[]> {
+    const storage = await this.getStorage();
+    return storage.getActivityLogs(filters);
+  }
+
+  async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
+    const storage = await this.getStorage();
+    return storage.createActivityLog(insertLog);
+  }
+
+  async deleteActivityLogs(olderThanDays: number): Promise<number> {
+    const storage = await this.getStorage();
+    return storage.deleteActivityLogs(olderThanDays);
+  }
+
+  async getSystemStats(): Promise<{
+    totalTransactions: number;
+    totalAccounts: number;
+    totalCategories: number;
+    totalProducts: number;
+    systemHealth: string;
+  }> {
+    const storage = await this.getStorage();
+    return storage.getSystemStats();
+  }
+
+  async getAnalyticsBalance(userId: number): Promise<{ balance: number }> {
+    const storage = await this.getStorage();
+    return storage.getAnalyticsBalance(userId);
+  }
+
+  async getAnalyticsCategorySpending(userId: number, startDate: string, endDate: string): Promise<Array<{ category: string; amount: number; color: string }>> {
+    const storage = await this.getStorage();
+    return storage.getAnalyticsCategorySpending(userId, startDate, endDate);
+  }
+
+  async getAnalyticsMonthly(userId: number): Promise<Array<{ month: string; income: number; expenses: number }>> {
+    const storage = await this.getStorage();
+    return storage.getAnalyticsMonthly(userId);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    const storage = await this.getStorage();
+    return storage.getAllUsers();
+  }
+
+  async getUserStats(): Promise<{ totalUsers: number; activeUsers: number; adminUsers: number }> {
+    const storage = await this.getStorage();
+    return storage.getUserStats();
+  }
+
+  async bulkCreateTransactions(transactions: InsertTransaction[]): Promise<Transaction[]> {
+    const storage = await this.getStorage();
+    return storage.bulkCreateTransactions(transactions);
+  }
+
+  async getTransactionsByDateRange(userId: number, startDate: string, endDate: string): Promise<Transaction[]> {
+    const storage = await this.getStorage();
+    return storage.getTransactionsByDateRange(userId, startDate, endDate);
+  }
+
+  async getUserActivitySummary(userId: number): Promise<{ lastLogin: Date | null; totalTransactions: number; totalSpent: number }> {
+    const storage = await this.getStorage();
+    return storage.getUserActivitySummary(userId);
+  }
+}
+
+export const storage: IStorage = new StorageProxy();
+
+// Export function to explicitly initialize storage after wizard
+export async function setStorageFromWizard(provider: string, config?: any): Promise<void> {
+  if (provider === 'sqlite') {
+    console.log('Setting up SQLite storage from initialization wizard');
+    storageInstance = new SQLiteStorage('./data/finance.db');
+  } else {
+    // For other providers, they should be set up through database manager
+    const activeConfig = databaseManager.getActiveConnection();
+    if (activeConfig) {
+      if (activeConfig.provider === 'postgresql' && !activeConfig.connectionString.includes('neon')) {
+        storageInstance = new DatabaseStorage(activeConfig.connectionString);
+      } else {
+        // Fall back to SQLite for unsupported providers temporarily
+        storageInstance = new SQLiteStorage('./data/finance.db');
+      }
+    }
+  }
+}
