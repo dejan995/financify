@@ -157,6 +157,15 @@ export class InitializationManager {
       } else if (databaseConfig.provider === 'supabase') {
         // Initialize Supabase storage
         const { SupabaseStorage } = await import('./supabase-storage-simple');
+        console.log('Initializing Supabase storage with credentials:');
+        console.log('- URL:', databaseConfig.supabaseUrl);
+        console.log('- Anon Key provided:', databaseConfig.supabaseAnonKey ? 'Yes' : 'No');
+        console.log('- Service Key provided:', databaseConfig.supabaseServiceKey ? 'Yes' : 'No');
+        
+        if (!databaseConfig.supabaseServiceKey) {
+          throw new Error('Supabase Service Role Key is required for automatic setup');
+        }
+        
         storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!, databaseConfig.supabaseServiceKey!);
         
         // Initialize Supabase schema automatically in public schema

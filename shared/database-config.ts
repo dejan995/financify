@@ -83,8 +83,8 @@ export const databaseProviderInfo = {
     dialect: "postgresql" as const,
     defaultPort: 5432,
     supportsSsl: true,
-    connectionStringFormat: "Supabase URL + Anonymous Key",
-    requiresCredentials: ["supabaseUrl", "supabaseAnonKey"] as const
+    connectionStringFormat: "Supabase URL + Anonymous Key + Service Role Key",
+    requiresCredentials: ["supabaseUrl", "supabaseAnonKey", "supabaseServiceKey"] as const
   },
   mysql: {
     name: "MySQL",

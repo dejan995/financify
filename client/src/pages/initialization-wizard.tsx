@@ -39,6 +39,7 @@ const databaseSetupSchema = z.object({
   // Supabase-specific fields
   supabaseUrl: z.string().optional(),
   supabaseAnonKey: z.string().optional(),
+  supabaseServiceKey: z.string().optional(),
 });
 
 type AdminSetupForm = z.infer<typeof adminSetupSchema>;
@@ -71,6 +72,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
       name: "Main Database",
       supabaseUrl: "",
       supabaseAnonKey: "",
+      supabaseServiceKey: "",
     },
   });
 

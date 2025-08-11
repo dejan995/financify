@@ -13,43 +13,80 @@ export class SupabaseManagement {
 
   async createAllTables(): Promise<void> {
     console.log('Creating tables automatically using Supabase Management API with Service Role Key...');
+    console.log('Service Role Key provided:', this.serviceRoleKey ? 'Yes' : 'No');
+    console.log('Supabase URL:', this.supabaseUrl);
+    
+    if (!this.serviceRoleKey) {
+      throw new Error('Service Role Key is required for automatic table creation');
+    }
     
     try {
-      // Use the Service Role Key to execute SQL directly via PostgREST
-      const createTablesSQL = this.getCreateTablesSQL();
-      
       // Create a service role client for DDL operations
       const { createClient } = await import('@supabase/supabase-js');
-      const serviceClient = createClient(this.supabaseUrl, this.serviceRoleKey);
+      console.log('Creating service client with Service Role Key...');
       
-      // Execute SQL using the service role client
-      const { error } = await serviceClient.rpc('exec_sql', { 
-        sql: createTablesSQL 
+      const serviceClient = createClient(this.supabaseUrl, this.serviceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
       });
-
-      if (error) {
-        console.log('RPC approach failed, trying direct SQL execution...');
+      
+      // Test the service client first
+      console.log('Testing service client connection...');
+      const { data: testData, error: testError } = await serviceClient
+        .from('pg_tables')
+        .select('tablename')
+        .limit(1);
+      
+      if (testError) {
+        console.error('Service client test failed:', testError);
+        throw new Error(`Service Role Key authentication failed: ${testError.message}`);
+      }
+      
+      console.log('Service client authenticated successfully');
+      
+      // Create tables one by one for better error handling
+      const statements = this.getIndividualCreateStatements();
+      
+      for (let i = 0; i < statements.length; i++) {
+        const statement = statements[i];
+        const tableName = statement.match(/CREATE TABLE IF NOT EXISTS (\w+)/)?.[1] || `table_${i}`;
         
-        // Alternative: Use direct SQL execution approach
-        const statements = this.getIndividualCreateStatements();
+        console.log(`Creating table: ${tableName}...`);
         
-        for (const statement of statements) {
-          try {
-            console.log('Creating table:', statement.split('(')[0]);
-            const { error: execError } = await serviceClient.rpc('exec_sql', { 
-              sql: statement 
-            });
-            
-            if (execError) {
-              console.log(`Table creation result: ${execError.message || 'completed'}`);
-            }
-          } catch (stmtError) {
-            console.log('Statement executed:', statement.substring(0, 50) + '...');
+        try {
+          // Use direct SQL execution through PostgREST
+          const { data, error } = await serviceClient.rpc('exec_sql', { 
+            sql: statement 
+          });
+          
+          if (error) {
+            console.log(`Table ${tableName} creation result:`, error.message);
+            // Continue with other tables even if one fails
+          } else {
+            console.log(`Table ${tableName} created successfully`);
           }
+        } catch (stmtError) {
+          console.log(`Table ${tableName} creation completed with result:`, stmtError);
+          // Continue with other tables
         }
       }
       
-      console.log('All tables created successfully via Management API');
+      console.log('All table creation attempts completed');
+      
+      // Verify users table was created
+      const { data: usersCheck, error: usersError } = await serviceClient
+        .from('users')
+        .select('id')
+        .limit(1);
+        
+      if (usersError && usersError.code === '42P01') {
+        throw new Error('Users table was not created successfully - please check Service Role Key permissions');
+      }
+      
+      console.log('Users table verification successful');
+      
     } catch (error) {
       console.error('Management API table creation error:', error);
       throw error;
