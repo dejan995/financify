@@ -69,24 +69,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Create database configuration if not SQLite
       if (database.provider !== "sqlite") {
-        const dbConfig = await databaseManager.addDatabaseConfig({
-          name: database.name,
-          provider: database.provider,
-          host: database.host || "",
-          port: database.port ? parseInt(database.port) : null,
-          database: database.database || "",
-          username: database.username || "",
-          password: database.password || "",
-          connectionString: database.connectionString || "",
-          ssl: true,
-          isActive: false, // Don't activate immediately, let user test first
-        });
+        try {
+          const dbConfig = await databaseManager.addDatabaseConfig({
+            name: database.name,
+            provider: database.provider,
+            host: database.host || "",
+            port: database.port ? parseInt(database.port) : null,
+            database: database.database || "",
+            username: database.username || "",
+            password: database.password || "",
+            connectionString: database.connectionString || "",
+            ssl: true,
+            isActive: false, // Don't activate immediately, let user test first
+          });
 
-        res.json({ 
-          message: "Application initialized successfully",
-          admin: { id: adminUser.id, username: adminUser.username },
-          database: { id: dbConfig.id, name: dbConfig.name, provider: dbConfig.provider }
-        });
+          res.json({ 
+            message: `Application initialized successfully with ${database.provider}. Note: Using memory storage temporarily to avoid connectivity issues. Test your database connection in the admin panel to activate external storage.`,
+            admin: { id: adminUser.id, username: adminUser.username },
+            database: { id: dbConfig.id, name: dbConfig.name, provider: dbConfig.provider },
+            warning: "External database configuration saved but not activated. Using memory storage until connection is verified."
+          });
+        } catch (error) {
+          console.error("Database configuration failed:", error);
+          res.json({ 
+            message: `Application initialized successfully. Database configuration for ${database.provider} failed, using memory storage.`,
+            admin: { id: adminUser.id, username: adminUser.username },
+            database: { provider: "memory", name: "Temporary Memory Storage" },
+            error: "Database configuration failed, using memory storage temporarily"
+          });
+        }
       } else {
         res.json({ 
           message: "Application initialized successfully with SQLite",

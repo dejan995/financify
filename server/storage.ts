@@ -30,6 +30,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: UpsertUser): Promise<User>;
   updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined>;
+  getAccountBalance(userId: number): Promise<{ balance: number }>;
 
   // Accounts
   getAccounts(userId: number): Promise<Account[]>;
@@ -694,6 +695,12 @@ export class MemStorage implements IStorage {
   async getUserCount(): Promise<number> {
     return this.users.size;
   }
+
+  async getAccountBalance(userId: number): Promise<{ balance: number }> {
+    const userAccounts = Array.from(this.accounts.values()).filter(a => a.userId === userId);
+    const balance = userAccounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
+    return { balance };
+  }
 }
 
 import { DatabaseStorage } from './database-storage';
@@ -1075,25 +1082,29 @@ class StorageProxy implements IStorage {
     const storage = await this.getStorage();
     return storage.getUserActivitySummary(userId);
   }
+
+  async getAccountBalance(userId: number): Promise<{ balance: number }> {
+    const storage = await this.getStorage();
+    return storage.getAccountBalance(userId);
+  }
 }
 
 export const storage: IStorage = new StorageProxy();
 
 // Export function to explicitly initialize storage after wizard
 export async function setStorageFromWizard(provider: string, config?: any): Promise<void> {
+  console.log(`Initializing storage with provider: ${provider}`);
+  
   if (provider === 'sqlite') {
     console.log('Setting up SQLite storage from initialization wizard');
     storageInstance = new SQLiteStorage('./data/finance.db');
   } else {
-    // For other providers, they should be set up through database manager
-    const activeConfig = databaseManager.getActiveConnection();
-    if (activeConfig) {
-      if (activeConfig.provider === 'postgresql' && !activeConfig.connectionString.includes('neon')) {
-        storageInstance = new DatabaseStorage(activeConfig.connectionString);
-      } else {
-        // Fall back to SQLite for unsupported providers temporarily
-        storageInstance = new SQLiteStorage('./data/finance.db');
-      }
-    }
+    console.log(`Provider ${provider} selected - will remain in memory storage until external database connection is properly configured`);
+    // For cloud providers like Supabase, Neon, etc., keep using memory storage 
+    // until the connection is properly tested and working
+    // This prevents WebSocket issues and silent failures
+    storageInstance = new MemStorage();
+    
+    console.log(`Note: External database configuration (${provider}) was saved but application is using memory storage to avoid connectivity issues. Please test the database connection in the admin panel and activate it when ready.`);
   }
 }
