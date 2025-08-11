@@ -536,7 +536,7 @@ export class SQLiteStorage implements IStorage {
   }
 
   async logActivity(log: InsertActivityLog): Promise<ActivityLog> {
-    const result = await this.db.insert(schema.activityLog).values({
+    const result = await this.db.insert(schema.activityLogs).values({
       ...log,
       createdAt: new Date().toISOString(),
     }).returning();

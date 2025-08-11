@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  # Main application
+  finance-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DATABASE_URL=${DATABASE_URL:-}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:-}
+      - SESSION_SECRET=${SESSION_SECRET:-finance-app-secret-key-change-in-production}
+    volumes:
+      # Mount data directory for persistent storage (SQLite, configs, etc.)
+      - finance-data:/app/data
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - finance-network
+
+  # PostgreSQL database (optional - use if not using Supabase)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-finance_db}
+      - POSTGRES_USER=${POSTGRES_USER:-finance_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-finance_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Initialize database with schema if needed
+      - ./supabase-setup.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - finance-network
+
+  # Redis for session storage (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    networks:
+      - finance-network
+    command: redis-server --appendonly yes
+
+volumes:
+  finance-data:
+    driver: local
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  finance-network:
+    driver: bridge

@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build outputs
+dist
+client/dist
+.next
+out
+
+# Development files
+.env*
+.git
+.gitignore
+README.md
+replit.md
+
+# Data and logs
+data/
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docker files (don't copy into image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Test files
+coverage/
+.nyc_output
+test/
+tests/
+__tests__/
+
+# Temporary files
+tmp/
+temp/

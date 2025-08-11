@@ -525,7 +525,7 @@ export class MemStorage implements IStorage {
   }
 
   // Analytics operations
-  async getAccountBalance(userId: number): Promise<number> {
+  async getTotalAccountBalance(userId: number): Promise<number> {
     const accounts = await this.getAccounts(userId);
     return accounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
   }
@@ -696,11 +696,7 @@ export class MemStorage implements IStorage {
     return this.users.size;
   }
 
-  async getAccountBalance(userId: number): Promise<{ balance: number }> {
-    const userAccounts = Array.from(this.accounts.values()).filter(a => a.userId === userId);
-    const balance = userAccounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
-    return { balance };
-  }
+
 }
 
 import { DatabaseStorage } from './database-storage';

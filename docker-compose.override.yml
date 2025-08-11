@@ -1,0 +1,28 @@
+# Override file for development
+# This file is automatically loaded by docker-compose
+# and overrides settings in docker-compose.yml
+
+version: '3.8'
+
+services:
+  finance-app:
+    build:
+      context: .
+      target: runner
+    volumes:
+      # Mount source code for development (hot reload)
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    ports:
+      - "5000:5000"
+
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=finance_dev
+      - POSTGRES_USER=dev_user  
+      - POSTGRES_PASSWORD=dev_password
