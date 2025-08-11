@@ -188,7 +188,10 @@ export class InitializationManager {
       }
 
       // Create admin user
+      console.log('Creating admin user:', adminData.username);
       const hashedPassword = await AuthService.hashPassword(adminData.password);
+      console.log('Password hashed successfully');
+      
       const adminUser = await storage.createUser({
         username: adminData.username,
         email: adminData.email,
@@ -204,6 +207,8 @@ export class InitializationManager {
         passwordResetExpires: null,
         lastLoginAt: null,
       } as UpsertUser);
+      
+      console.log('Admin user created successfully:', adminUser.id);
 
       // Save initialization configuration
       const initConfig: InitializationConfig = {
@@ -243,10 +248,16 @@ export class InitializationManager {
       };
     } catch (error) {
       console.error('Full initialization error:', error);
+      console.error('Error type:', typeof error);
+      console.error('Error name:', (error as any)?.name);
+      console.error('Error message:', (error as any)?.message);
+      console.error('Error code:', (error as any)?.code);
+      console.error('Error details:', (error as any)?.details);
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
+      
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown initialization error'
+        error: error instanceof Error ? error.message : `Unknown initialization error: ${JSON.stringify(error)}`
       };
     }
   }
