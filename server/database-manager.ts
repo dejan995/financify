@@ -550,42 +550,114 @@ export class DatabaseManager {
 
   private async insertUsers(db: any, users: any[]) {
     if (users.length === 0) return;
-    await db.insert(schema.users).values(users);
+    
+    // Transform user data to handle date fields for SQLite
+    const transformedUsers = users.map(user => ({
+      ...user,
+      createdAt: user.createdAt ? Math.floor(new Date(user.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: user.updatedAt ? Math.floor(new Date(user.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      lastLoginAt: user.lastLoginAt ? Math.floor(new Date(user.lastLoginAt).getTime() / 1000) : null,
+      passwordResetExpires: user.passwordResetExpires ? Math.floor(new Date(user.passwordResetExpires).getTime() / 1000) : null
+    }));
+    
+    await db.insert(schema.users).values(transformedUsers);
   }
 
   private async insertCategories(db: any, categories: any[]) {
     if (categories.length === 0) return;
-    await db.insert(schema.categories).values(categories);
+    
+    // Transform category data for SQLite
+    const transformedCategories = categories.map(category => ({
+      ...category,
+      createdAt: category.createdAt ? Math.floor(new Date(category.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: category.updatedAt ? Math.floor(new Date(category.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.categories).values(transformedCategories);
   }
 
   private async insertAccounts(db: any, accounts: any[]) {
     if (accounts.length === 0) return;
-    await db.insert(schema.accounts).values(accounts);
+    
+    // Transform account data for SQLite
+    const transformedAccounts = accounts.map(account => ({
+      ...account,
+      createdAt: account.createdAt ? Math.floor(new Date(account.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: account.updatedAt ? Math.floor(new Date(account.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.accounts).values(transformedAccounts);
   }
 
   private async insertTransactions(db: any, transactions: any[]) {
     if (transactions.length === 0) return;
-    await db.insert(schema.transactions).values(transactions);
+    
+    // Transform transaction data for SQLite
+    const transformedTransactions = transactions.map(transaction => ({
+      ...transaction,
+      date: transaction.date ? Math.floor(new Date(transaction.date).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      createdAt: transaction.createdAt ? Math.floor(new Date(transaction.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: transaction.updatedAt ? Math.floor(new Date(transaction.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.transactions).values(transformedTransactions);
   }
 
   private async insertBudgets(db: any, budgets: any[]) {
     if (budgets.length === 0) return;
-    await db.insert(schema.budgets).values(budgets);
+    
+    // Transform budget data for SQLite
+    const transformedBudgets = budgets.map(budget => ({
+      ...budget,
+      startDate: budget.startDate ? Math.floor(new Date(budget.startDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      endDate: budget.endDate ? Math.floor(new Date(budget.endDate).getTime() / 1000) : null,
+      createdAt: budget.createdAt ? Math.floor(new Date(budget.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: budget.updatedAt ? Math.floor(new Date(budget.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.budgets).values(transformedBudgets);
   }
 
   private async insertGoals(db: any, goals: any[]) {
     if (goals.length === 0) return;
-    await db.insert(schema.goals).values(goals);
+    
+    // Transform goal data for SQLite
+    const transformedGoals = goals.map(goal => ({
+      ...goal,
+      targetDate: goal.targetDate ? Math.floor(new Date(goal.targetDate).getTime() / 1000) : null,
+      createdAt: goal.createdAt ? Math.floor(new Date(goal.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: goal.updatedAt ? Math.floor(new Date(goal.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.goals).values(transformedGoals);
   }
 
   private async insertBills(db: any, bills: any[]) {
     if (bills.length === 0) return;
-    await db.insert(schema.bills).values(bills);
+    
+    // Transform bill data for SQLite
+    const transformedBills = bills.map(bill => ({
+      ...bill,
+      dueDate: bill.dueDate ? Math.floor(new Date(bill.dueDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      lastPaid: bill.lastPaid ? Math.floor(new Date(bill.lastPaid).getTime() / 1000) : null,
+      createdAt: bill.createdAt ? Math.floor(new Date(bill.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: bill.updatedAt ? Math.floor(new Date(bill.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.bills).values(transformedBills);
   }
 
   private async insertProducts(db: any, products: any[]) {
     if (products.length === 0) return;
-    await db.insert(schema.products).values(products);
+    
+    // Transform product data for SQLite
+    const transformedProducts = products.map(product => ({
+      ...product,
+      createdAt: product.createdAt ? Math.floor(new Date(product.createdAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      updatedAt: product.updatedAt ? Math.floor(new Date(product.updatedAt).getTime() / 1000) : Math.floor(Date.now() / 1000)
+    }));
+    
+    await db.insert(schema.products).values(transformedProducts);
   }
 
   getMigrationLogs(): MigrationLog[] {
