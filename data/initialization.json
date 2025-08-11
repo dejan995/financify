@@ -1,7 +1,7 @@
 {
   "isInitialized": true,
   "adminUser": {
-    "id": 3,
+    "id": 4,
     "username": "dejan",
     "email": "dejan.petrov95@hotmail.com"
   },
@@ -9,5 +9,5 @@
     "provider": "supabase",
     "name": "Main Database"
   },
-  "createdAt": "2025-08-11T17:33:52.361Z"
+  "createdAt": "2025-08-11T17:49:58.924Z"
 }
