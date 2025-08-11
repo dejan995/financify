@@ -156,7 +156,7 @@ export class InitializationManager {
         storage = new SQLiteStorage('./data/finance.db');
       } else if (databaseConfig.provider === 'supabase') {
         // Initialize Supabase storage
-        const { SupabaseStorage } = await import('./supabase-storage');
+        const { SupabaseStorage } = await import('./supabase-storage-simple');
         storage = new SupabaseStorage(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!);
         
         // Initialize Supabase schema automatically in public schema
@@ -173,7 +173,7 @@ export class InitializationManager {
           name: databaseConfig.name,
           provider: databaseConfig.provider,
           host: databaseConfig.host || '',
-          port: databaseConfig.port ? parseInt(databaseConfig.port) : null,
+          port: databaseConfig.port ? parseInt(databaseConfig.port) : undefined,
           database: databaseConfig.database || '',
           username: databaseConfig.username || '',
           password: databaseConfig.password || '',

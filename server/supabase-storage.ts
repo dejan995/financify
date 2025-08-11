@@ -2,16 +2,16 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { IStorage } from "./storage";
 import { initializeSupabaseClient } from "./supabase-client";
 import {
-  User, NewUser, SelectUser,
-  Account, NewAccount, SelectAccount,
-  Category, NewCategory, SelectCategory,
-  Transaction, NewTransaction, SelectTransaction,
-  Budget, NewBudget, SelectBudget,
-  Goal, NewGoal, SelectGoal,
-  Bill, NewBill, SelectBill,
-  Product, NewProduct, SelectProduct,
-  ActivityLog, NewActivityLog, SelectActivityLog,
-  SystemConfig, NewSystemConfig, SelectSystemConfig
+  User, UpsertUser,
+  Account, InsertAccount,
+  Category, InsertCategory,
+  Transaction, InsertTransaction,
+  Budget, InsertBudget,
+  Goal, InsertGoal,
+  Bill, InsertBill,
+  Product, InsertProduct,
+  ActivityLog, InsertActivityLog,
+  SystemConfig, InsertSystemConfig
 } from "@shared/schema";
 
 export class SupabaseStorage implements IStorage {
@@ -340,7 +340,7 @@ export class SupabaseStorage implements IStorage {
     return count || 0;
   }
 
-  async createUser(userData: NewUser): Promise<SelectUser> {
+  async createUser(userData: UpsertUser): Promise<User> {
     const { data, error } = await this.client
       .from('users')
       .insert(userData)
@@ -351,7 +351,7 @@ export class SupabaseStorage implements IStorage {
     return data;
   }
 
-  async getUserByUsername(username: string): Promise<SelectUser | null> {
+  async getUserByUsername(username: string): Promise<User | null> {
     const { data, error } = await this.client
       .from('users')
       .select('*')
@@ -365,7 +365,7 @@ export class SupabaseStorage implements IStorage {
     return data;
   }
 
-  async getUserByEmail(email: string): Promise<SelectUser | null> {
+  async getUserByEmail(email: string): Promise<User | null> {
     const { data, error } = await this.client
       .from('users')
       .select('*')
@@ -379,7 +379,7 @@ export class SupabaseStorage implements IStorage {
     return data;
   }
 
-  async getUserById(id: number): Promise<SelectUser | null> {
+  async getUserById(id: number): Promise<User | null> {
     const { data, error } = await this.client
       .from('users')
       .select('*')
@@ -393,7 +393,7 @@ export class SupabaseStorage implements IStorage {
     return data;
   }
 
-  async updateUser(id: number, userData: Partial<NewUser>): Promise<SelectUser> {
+  async updateUser(id: number, userData: Partial<UpsertUser>): Promise<User> {
     const { data, error } = await this.client
       .from('users')
       .update(userData)
@@ -405,16 +405,17 @@ export class SupabaseStorage implements IStorage {
     return data;
   }
 
-  async deleteUser(id: number): Promise<void> {
+  async deleteUser(id: number): Promise<boolean> {
     const { error } = await this.client
       .from('users')
       .delete()
       .eq('id', id);
     
     if (error) throw error;
+    return true;
   }
 
-  async getUsers(): Promise<SelectUser[]> {
+  async getUsers(): Promise<User[]> {
     const { data, error } = await this.client
       .from('users')
       .select('*')
