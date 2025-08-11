@@ -713,14 +713,8 @@ let storageInstance: IStorage | null = null;
 
 // Check if app has been initialized by checking if any storage exists
 function checkInitializationStatus(): boolean {
-  // Check if SQLite database exists
-  if (existsSync('./data/finance.db')) {
-    return true;
-  }
-  
-  // Check if any database configurations exist
-  const activeConfig = databaseManager.getActiveConnection();
-  return activeConfig !== null;
+  // Use the initialization manager to check if app is initialized
+  return initializationManager.isInitialized();
 }
 
 // Initialize storage only after initialization wizard completes
@@ -746,6 +740,44 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
     }
   }
 
+  // Check if app is initialized and restore the configured database
+  if (initializationManager.isInitialized()) {
+    const config = initializationManager.getConfig();
+    console.log('App is initialized, restoring database configuration...');
+    
+    if (config.database?.provider === 'sqlite') {
+      console.log('Restoring SQLite storage from initialization config');
+      storageInstance = new SQLiteStorage('./data/finance.db');
+      return storageInstance;
+    } else if (config.database?.provider === 'supabase') {
+      console.log('Restoring Supabase storage from initialization config');
+      
+      try {
+        // Load database configuration to get Supabase credentials
+        const memStorage = new MemStorage();
+        const dbConfigs = await memStorage.getDatabaseConfigs();
+        const supabaseConfig = dbConfigs.find(cfg => cfg.provider === 'supabase');
+        
+        if (supabaseConfig) {
+          console.log('Found Supabase credentials, initializing storage...');
+          const { SupabaseStorageNew } = await import('./supabase-storage-new');
+          storageInstance = new SupabaseStorageNew(
+            supabaseConfig.supabaseUrl!,
+            supabaseConfig.supabaseAnonKey!,
+            supabaseConfig.supabaseServiceKey!
+          );
+          console.log('✓ Supabase storage restored successfully');
+          return storageInstance;
+        } else {
+          console.log('Supabase config not found, using memory storage');
+        }
+      } catch (error) {
+        console.error('Failed to restore Supabase storage:', error);
+        console.log('Falling back to memory storage');
+      }
+    }
+  }
+
   // Check for active database configuration from database manager
   const activeConfig = databaseManager.getActiveConnection();
   if (activeConfig && activeConfig.provider !== 'neon') {
@@ -768,10 +800,13 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
 class StorageProxy implements IStorage {
   private async getStorage(): Promise<IStorage> {
     if (!storageInstance) {
+      console.log('[StorageProxy] Storage not initialized, checking status...');
       if (checkInitializationStatus()) {
+        console.log('[StorageProxy] App is initialized, restoring storage...');
         // App was previously initialized, initialize storage
         await initializeStorage();
       } else {
+        console.log('[StorageProxy] App not initialized yet, using memory storage temporarily');
         // App not initialized yet, use memory storage temporarily
         storageInstance = new MemStorage();
       }

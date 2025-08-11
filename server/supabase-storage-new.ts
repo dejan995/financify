@@ -139,6 +139,7 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
   }
 
   async getUserByUsername(username: string): Promise<User | null> {
+    console.log(`[SupabaseStorage] Looking up user: ${username}`);
     const { data, error } = await this.serviceClient
       .from('users')
       .select('*')
@@ -152,7 +153,33 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
       throw new Error(`Failed to get user: ${error.message}`);
     }
 
-    return data;
+    if (!data) return null;
+
+    console.log(`[SupabaseStorage] Raw user data:`, JSON.stringify(data, null, 2));
+    console.log(`[SupabaseStorage] is_active value:`, data.is_active, 'type:', typeof data.is_active);
+
+    // Transform Supabase data to our User interface
+    const transformedUser = {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      passwordHash: data.password_hash,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profileImageUrl: data.profile_image_url,
+      role: data.role,
+      isActive: data.is_active,
+      isEmailVerified: data.is_email_verified,
+      emailVerificationToken: data.email_verification_token,
+      passwordResetToken: data.password_reset_token,
+      passwordResetExpires: data.password_reset_expires,
+      lastLoginAt: data.last_login_at,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+    
+    console.log(`[SupabaseStorage] Transformed user:`, JSON.stringify(transformedUser, null, 2));
+    return transformedUser;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
@@ -169,7 +196,27 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
       throw new Error(`Failed to get user: ${error.message}`);
     }
 
-    return data;
+    if (!data) return null;
+
+    // Transform Supabase data to our User interface
+    return {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      passwordHash: data.password_hash,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profileImageUrl: data.profile_image_url,
+      role: data.role,
+      isActive: data.is_active,
+      isEmailVerified: data.is_email_verified,
+      emailVerificationToken: data.email_verification_token,
+      passwordResetToken: data.password_reset_token,
+      passwordResetExpires: data.password_reset_expires,
+      lastLoginAt: data.last_login_at,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
   }
 
   async getUserById(id: number): Promise<User | null> {
@@ -186,7 +233,27 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
       throw new Error(`Failed to get user: ${error.message}`);
     }
 
-    return data;
+    if (!data) return null;
+
+    // Transform Supabase data to our User interface
+    return {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      passwordHash: data.password_hash,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profileImageUrl: data.profile_image_url,
+      role: data.role,
+      isActive: data.is_active,
+      isEmailVerified: data.is_email_verified,
+      emailVerificationToken: data.email_verification_token,
+      passwordResetToken: data.password_reset_token,
+      passwordResetExpires: data.password_reset_expires,
+      lastLoginAt: data.last_login_at,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
   }
 
   async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User> {

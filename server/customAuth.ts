@@ -150,10 +150,14 @@ export function setupAuth(app: Express) {
       async (username, password, done) => {
         try {
           const user = await storage.getUserByUsername(username);
+          console.log('Login attempt for username:', username);
+          console.log('User data retrieved:', JSON.stringify(user, null, 2));
+          
           if (!user) {
             return done(null, false, { message: "Invalid username or password" });
           }
 
+          console.log('User isActive value:', user.isActive, 'Type:', typeof user.isActive);
           if (!user.isActive) {
             return done(null, false, { message: "Account is disabled" });
           }
