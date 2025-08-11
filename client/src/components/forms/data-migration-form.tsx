@@ -39,7 +39,7 @@ export function DataMigrationForm({ databases, onClose, onSuccess }: DataMigrati
   });
 
   const migrationMutation = useMutation({
-    mutationFn: (data: MigrationData) => apiRequest("/api/admin/databases/migrate", "POST", data),
+    mutationFn: (data: MigrationData) => apiRequest("POST", "/api/admin/databases/migrate", data),
     onSuccess: (data: any) => {
       toast({
         title: "Migration Started",

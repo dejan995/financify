@@ -41,7 +41,7 @@ export function DatabaseConfigForm({ config, onClose, onSuccess }: DatabaseConfi
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest("/api/admin/databases", "POST", data),
+    mutationFn: (data: FormData) => apiRequest("POST", "/api/admin/databases", data),
     onSuccess: () => {
       toast({
         title: "Database Added",
@@ -59,7 +59,7 @@ export function DatabaseConfigForm({ config, onClose, onSuccess }: DatabaseConfi
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest(`/api/admin/databases/${config?.id}`, "PUT", data),
+    mutationFn: (data: FormData) => apiRequest("PUT", `/api/admin/databases/${config?.id}`, data),
     onSuccess: () => {
       toast({
         title: "Database Updated",

@@ -31,7 +31,7 @@ export default function DatabaseManagement() {
 
   // Test connection mutation
   const testConnectionMutation = useMutation({
-    mutationFn: (configId: string) => apiRequest(`/api/admin/databases/${configId}/test`, "POST"),
+    mutationFn: (configId: string) => apiRequest("POST", `/api/admin/databases/${configId}/test`),
     onMutate: (configId) => {
       setTestingConfig(configId);
     },
@@ -62,7 +62,7 @@ export default function DatabaseManagement() {
 
   // Activate database mutation
   const activateMutation = useMutation({
-    mutationFn: (configId: string) => apiRequest(`/api/admin/databases/${configId}/activate`, "POST"),
+    mutationFn: (configId: string) => apiRequest("POST", `/api/admin/databases/${configId}/activate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/databases"] });
       toast({
@@ -81,7 +81,7 @@ export default function DatabaseManagement() {
 
   // Delete database mutation
   const deleteMutation = useMutation({
-    mutationFn: (configId: string) => apiRequest(`/api/admin/databases/${configId}`, "DELETE"),
+    mutationFn: (configId: string) => apiRequest("DELETE", `/api/admin/databases/${configId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/databases"] });
       setDeletingConfig(null);
