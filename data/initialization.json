@@ -2,12 +2,12 @@
   "isInitialized": true,
   "adminUser": {
     "id": 1,
-    "username": "admin",
-    "email": "admin@financetracker.com"
+    "username": "testadmin",
+    "email": "test@financetracker.com"
   },
   "database": {
     "provider": "sqlite",
-    "name": "Main SQLite Database"
+    "name": "WordPress-style SQLite Database"
   },
-  "createdAt": "2025-08-11T14:52:19.437Z"
+  "createdAt": "2025-08-11T14:54:32.449Z"
 }
