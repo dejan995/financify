@@ -124,6 +124,9 @@ Changelog:
 - August 11, 2025. Simplified Supabase integration to work with existing public schema - automatic table creation during first use, no manual SQL required, leverages Supabase's default schema structure
 - August 11, 2025. Fixed broken CRUD operations throughout the application - resolved "storage2.getUser is not a function" errors by implementing missing getUser method in SupabaseStorageNew class and proper storage configuration restoration
 - August 11, 2025. Disabled default admin creation since admin user is properly created during initialization wizard, preventing duplicate admin user creation
+- August 11, 2025. Enhanced admin interface database status detection to properly show "Supabase" instead of "In Memory" when using Supabase storage
+- August 11, 2025. Implemented automatic Supabase table creation for all required database tables (accounts, categories, transactions, budgets, goals, bills, products) to prevent "relation does not exist" errors
+- August 11, 2025. Fixed session deserialization errors by adding proper error handling and storage availability checks in authentication system
 ```
 
 ## User Preferences

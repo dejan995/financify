@@ -145,10 +145,23 @@ export function setupAuth(app: Express) {
 
   passport.deserializeUser(async (id: number, done) => {
     try {
+      // Ensure storage is available before attempting to get user
+      if (!storage) {
+        console.log('Storage not available during session deserialization');
+        return done(null, false);
+      }
+
       const user = await storage.getUser(id);
+      if (!user) {
+        console.log(`User with id ${id} not found during session deserialization`);
+        return done(null, false);
+      }
+
       done(null, user);
     } catch (error) {
-      done(error);
+      console.error('Error during session deserialization:', error);
+      // Don't pass the error to avoid breaking the session - just return false
+      done(null, false);
     }
   });
 
