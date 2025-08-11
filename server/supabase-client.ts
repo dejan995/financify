@@ -28,21 +28,18 @@ export async function testSupabaseConnection(supabaseUrl: string, supabaseAnonKe
     console.log('- Anon Key provided:', supabaseAnonKey ? 'Yes' : 'No');
     console.log('- Service Key provided:', supabaseServiceKey ? 'Yes' : 'No');
     
-    // Test with anonymous key first
+    // Test with anonymous key first - simple auth check
     const testClient = createClient(supabaseUrl, supabaseAnonKey);
     
-    // Test basic connectivity by checking system tables
-    const { data, error } = await testClient
-      .from('pg_stat_activity')
-      .select('application_name')
-      .limit(1);
+    // Test basic connectivity with auth session
+    const { data: authData, error: authError } = await testClient.auth.getSession();
     
-    if (error) {
-      console.log('Anonymous key test result:', error.message);
-      // This is expected for basic auth tests
-    } else {
-      console.log('Anonymous key connection successful');
+    if (authError && !authError.message.includes('Auth session missing')) {
+      console.log('Anonymous key test failed:', authError.message);
+      return { success: false, error: `Anonymous key authentication failed: ${authError.message}` };
     }
+    
+    console.log('Anonymous key connection successful');
     
     // If service key is provided, test it too
     if (supabaseServiceKey) {
@@ -54,15 +51,12 @@ export async function testSupabaseConnection(supabaseUrl: string, supabaseAnonKe
         }
       });
       
-      // Test service role access to system tables
-      const { data: serviceData, error: serviceError } = await serviceClient
-        .from('pg_tables')
-        .select('tablename')
-        .limit(1);
+      // Test service role with a simple RPC call that should always work
+      const { data: versionData, error: versionError } = await serviceClient.rpc('version');
       
-      if (serviceError) {
-        console.error('Service key test failed:', serviceError);
-        return { success: false, error: `Service Role Key test failed: ${serviceError.message}` };
+      if (versionError && !versionError.message.includes('not found')) {
+        console.error('Service key test failed:', versionError);
+        return { success: false, error: `Service Role Key test failed: ${versionError.message}` };
       }
       
       console.log('Service key connection successful');
