@@ -475,6 +475,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Initialize admin user in Supabase (temporary endpoint for setup)
+  app.post("/api/admin/create-from-initialization", async (req: any, res) => {
+    try {
+      // Get initialization config
+      const config = initializationManager.getInitializationStatus();
+      if (!config.isInitialized || !config.adminUser) {
+        return res.status(400).json({ message: "No initialization data found" });
+      }
+
+      // Check if admin user already exists
+      const existingUser = await storage.getUserByUsername(config.adminUser.username);
+      if (existingUser) {
+        return res.json({ message: "Admin user already exists", user: existingUser });
+      }
+
+      // Create the admin user in Supabase with the same credentials as initialization
+      const hashedPassword = await AuthService.hashPassword("Admin123!");
+      const adminUser = await storage.createUser({
+        username: config.adminUser.username,
+        email: config.adminUser.email,
+        passwordHash: hashedPassword,
+        firstName: "Admin",
+        lastName: "User",
+        profileImageUrl: null,
+        role: "admin",
+        isActive: true,
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        lastLoginAt: null,
+      });
+
+      console.log("Admin user created in Supabase:", adminUser.username);
+      const { passwordHash, ...safeUser } = adminUser;
+      res.json({ message: "Admin user created successfully", user: safeUser });
+    } catch (error) {
+      console.error("Error creating admin user:", error);
+      res.status(500).json({ message: "Failed to create admin user" });
+    }
+  });
+
   // Admin routes
   app.get("/api/admin/users", requireAdmin, async (req: any, res) => {
     try {

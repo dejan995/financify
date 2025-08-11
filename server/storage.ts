@@ -706,6 +706,7 @@ export class MemStorage implements IStorage {
 import { DatabaseStorage } from './database-storage';
 import { SQLiteStorage } from './sqlite-storage';
 import { databaseManager } from './database-manager';
+import { initializationManager } from './initialization-manager';
 import { existsSync } from 'fs';
 
 // Storage instance - will be initialized after wizard completion
@@ -713,8 +714,15 @@ let storageInstance: IStorage | null = null;
 
 // Check if app has been initialized by checking if any storage exists
 function checkInitializationStatus(): boolean {
-  // Use the initialization manager to check if app is initialized
-  return initializationManager.isInitialized();
+  try {
+    // Use the initialization manager to check if app is initialized
+    const isInit = initializationManager.isInitialized();
+    console.log('[CheckInit] Initialization status:', isInit);
+    return isInit;
+  } catch (error) {
+    console.error('[CheckInit] Error checking status:', error);
+    return false;
+  }
 }
 
 // Initialize storage only after initialization wizard completes
@@ -753,9 +761,9 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
       console.log('Restoring Supabase storage from initialization config');
       
       try {
-        // Load database configuration to get Supabase credentials
-        const memStorage = new MemStorage();
-        const dbConfigs = await memStorage.getDatabaseConfigs();
+        // Load database configuration from saved files  
+        const dbConfigManager = await import('./database-config-manager');
+        const dbConfigs = await dbConfigManager.databaseConfigManager.getAllConfigs();
         const supabaseConfig = dbConfigs.find(cfg => cfg.provider === 'supabase');
         
         if (supabaseConfig) {
@@ -769,7 +777,7 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
           console.log('✓ Supabase storage restored successfully');
           return storageInstance;
         } else {
-          console.log('Supabase config not found, using memory storage');
+          console.log('Supabase config not found in saved configurations');
         }
       } catch (error) {
         console.error('Failed to restore Supabase storage:', error);
@@ -801,13 +809,44 @@ class StorageProxy implements IStorage {
   private async getStorage(): Promise<IStorage> {
     if (!storageInstance) {
       console.log('[StorageProxy] Storage not initialized, checking status...');
-      if (checkInitializationStatus()) {
-        console.log('[StorageProxy] App is initialized, restoring storage...');
-        // App was previously initialized, initialize storage
-        await initializeStorage();
+      const isInitialized = checkInitializationStatus();
+      console.log('[StorageProxy] Initialization status:', isInitialized);
+      
+      if (isInitialized) {
+        console.log('[StorageProxy] App is initialized, directly restoring Supabase storage...');
+        
+        try {
+          // Direct Supabase restoration without going through complex initialization
+          const config = initializationManager.getInitializationStatus();
+          if (config.database?.provider === 'supabase') {
+            console.log('[StorageProxy] Loading Supabase credentials...');
+            const dbConfigManager = await import('./database-config-manager');
+            const dbConfigs = await databaseConfigManager.getAllConfigs();
+            const supabaseConfig = dbConfigs.find(cfg => cfg.provider === 'supabase');
+            
+            if (supabaseConfig) {
+              console.log('[StorageProxy] Found Supabase config, initializing...');
+              const { SupabaseStorageNew } = await import('./supabase-storage-new');
+              storageInstance = new SupabaseStorageNew(
+                supabaseConfig.supabaseUrl!,
+                supabaseConfig.supabaseAnonKey!,
+                supabaseConfig.supabaseServiceKey!
+              );
+              console.log('[StorageProxy] ✓ Supabase storage successfully restored');
+            } else {
+              console.log('[StorageProxy] No Supabase config found, using memory storage');
+              storageInstance = new MemStorage();
+            }
+          } else {
+            console.log('[StorageProxy] Not Supabase provider, using memory storage');
+            storageInstance = new MemStorage();
+          }
+        } catch (error) {
+          console.error('[StorageProxy] Error during storage restoration:', error);
+          storageInstance = new MemStorage();
+        }
       } else {
         console.log('[StorageProxy] App not initialized yet, using memory storage temporarily');
-        // App not initialized yet, use memory storage temporarily
         storageInstance = new MemStorage();
       }
     }
