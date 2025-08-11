@@ -194,6 +194,43 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
     return transformedUser;
   }
 
+  async getUser(id: number): Promise<User | undefined> {
+    const { data, error } = await this.serviceClient
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return undefined; // No rows found
+      }
+      throw new Error(`Failed to get user: ${error.message}`);
+    }
+
+    if (!data) return undefined;
+
+    // Transform Supabase data to our User interface
+    return {
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      passwordHash: data.password_hash,
+      firstName: data.first_name,
+      lastName: data.last_name,
+      profileImageUrl: data.profile_image_url,
+      role: data.role,
+      isActive: data.is_active,
+      isEmailVerified: data.is_email_verified,
+      emailVerificationToken: data.email_verification_token,
+      passwordResetToken: data.password_reset_token,
+      passwordResetExpires: data.password_reset_expires,
+      lastLoginAt: data.last_login_at,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  }
+
   async getUserByEmail(email: string): Promise<User | undefined> {
     const { data, error } = await this.serviceClient
       .from('users')
@@ -231,42 +268,7 @@ ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
     };
   }
 
-  async getUserById(id: number): Promise<User | null> {
-    const { data, error } = await this.serviceClient
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // No rows found
-      }
-      throw new Error(`Failed to get user: ${error.message}`);
-    }
-
-    if (!data) return null;
-
-    // Transform Supabase data to our User interface
-    return {
-      id: data.id,
-      username: data.username,
-      email: data.email,
-      passwordHash: data.password_hash,
-      firstName: data.first_name,
-      lastName: data.last_name,
-      profileImageUrl: data.profile_image_url,
-      role: data.role,
-      isActive: data.is_active,
-      isEmailVerified: data.is_email_verified,
-      emailVerificationToken: data.email_verification_token,
-      passwordResetToken: data.password_reset_token,
-      passwordResetExpires: data.password_reset_expires,
-      lastLoginAt: data.last_login_at,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at,
-    };
-  }
 
   async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User> {
     const dbUpdates: any = {};

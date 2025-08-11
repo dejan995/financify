@@ -72,48 +72,9 @@ export class AuthService {
   }
 
   static async createDefaultAdmin(): Promise<User | null> {
-    try {
-      // Check if any users exist - if not, don't create default admin
-      // Let the initialization wizard handle this
-      try {
-        const userCount = await storage.getUserCount();
-        if (userCount === 0) {
-          console.log("No users found - initialization wizard will handle admin creation");
-          return null;
-        }
-      } catch (error) {
-        console.log("Storage not ready - initialization wizard will handle admin creation");
-        return null;
-      }
-
-      const existingAdmin = await storage.getUserByUsername("admin");
-      if (existingAdmin) {
-        return existingAdmin;
-      }
-
-      const hashedPassword = await AuthService.hashPassword("admin123");
-      const adminUser = await storage.createUser({
-        username: "admin",
-        email: "admin@financetracker.com",
-        passwordHash: hashedPassword,
-        firstName: "System",
-        lastName: "Administrator",
-        profileImageUrl: null,
-        role: "admin",
-        isActive: true,
-        isEmailVerified: true,
-        emailVerificationToken: null,
-        passwordResetToken: null,
-        passwordResetExpires: null,
-        lastLoginAt: null,
-      });
-
-      console.log("Default admin created with username: admin, password: admin123");
-      return adminUser;
-    } catch (error) {
-      console.error("Error creating default admin:", error);
-      return null;
-    }
+    // Default admin creation is disabled - admin user is created through initialization wizard
+    console.log("Default admin creation disabled - using initialization wizard");
+    return null;
   }
 }
 
