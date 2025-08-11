@@ -233,10 +233,15 @@ export class DatabaseManager {
       throw new Error(`Target database configuration not found: ${toConfigId}`);
     }
 
+    // Handle "memory" as null for consistency
+    if (fromConfigId === "memory") {
+      fromConfigId = null;
+    }
+
     const migrationId = randomUUID();
     const migrationLog: MigrationLog = {
       id: migrationId,
-      fromProvider: fromConfigId ? this.configs.get(fromConfigId)?.provider : undefined,
+      fromProvider: fromConfigId ? (fromConfigId.startsWith('supabase-') ? 'supabase' : this.configs.get(fromConfigId)?.provider) : undefined,
       toProvider: toConfig.provider,
       status: 'pending',
       startedAt: new Date(),
@@ -344,8 +349,8 @@ export class DatabaseManager {
   }
 
   private async extractAllData(fromConfigId: string | null) {
-    // If fromConfigId is null, extract from memory storage
-    if (!fromConfigId) {
+    // If fromConfigId is null or "memory", extract from memory storage
+    if (!fromConfigId || fromConfigId === "memory") {
       const { storage } = await import('./storage');
       return {
         users: await storage.getAllUsers(),
@@ -357,6 +362,32 @@ export class DatabaseManager {
         bills: [], // We'll need to get all bills across all users
         products: await storage.getProducts(),
       };
+    }
+
+    // Check if it's a Supabase configuration from initialization system
+    if (fromConfigId.startsWith('supabase-')) {
+      try {
+        const { databaseConfigManager } = await import('./database-config-manager');
+        const supabaseConfigs = await databaseConfigManager.getAllConfigs();
+        const supabaseConfig = supabaseConfigs.find((cfg: any) => cfg.id === fromConfigId);
+        
+        if (supabaseConfig) {
+          // Use current Supabase storage to extract data
+          const { storage } = await import('./storage');
+          return {
+            users: await storage.getAllUsers(),
+            categories: await storage.getCategories(0),
+            accounts: [], // We'll need to get all accounts across all users
+            transactions: [], // We'll need to get all transactions across all users  
+            budgets: [], // We'll need to get all budgets across all users
+            goals: [], // We'll need to get all goals across all users
+            bills: [], // We'll need to get all bills across all users
+            products: await storage.getProducts(),
+          };
+        }
+      } catch (error) {
+        console.error('Error accessing Supabase config:', error);
+      }
     }
 
     // Extract from another database
