@@ -27,13 +27,13 @@ interface DataMigrationFormProps {
 }
 
 export function DataMigrationForm({ databases, onClose, onSuccess }: DataMigrationFormProps) {
-  const [selectedSource, setSelectedSource] = useState<string>("");
+  const [selectedSource, setSelectedSource] = useState<string>("memory");
   const [selectedTarget, setSelectedTarget] = useState<string>("");
   
   const form = useForm<MigrationData>({
     resolver: zodResolver(migrationSchema),
     defaultValues: {
-      fromConfigId: "",
+      fromConfigId: "memory",
       toConfigId: "",
     },
   });
@@ -62,13 +62,13 @@ export function DataMigrationForm({ databases, onClose, onSuccess }: DataMigrati
 
   const connectedDatabases = databases.filter(db => db.isConnected);
   const sourceOptions = [
-    { id: "", name: "Current Memory Storage", provider: "memory" },
+    { id: "memory", name: "Current Memory Storage", provider: "memory" },
     ...connectedDatabases.filter(db => db.id !== selectedTarget)
   ];
   const targetOptions = connectedDatabases.filter(db => db.id !== selectedSource);
 
   const getSourceInfo = () => {
-    if (!selectedSource) {
+    if (!selectedSource || selectedSource === "memory") {
       return {
         name: "Current Memory Storage",
         description: "Data currently stored in application memory"
@@ -209,7 +209,7 @@ export function DataMigrationForm({ databases, onClose, onSuccess }: DataMigrati
             </div>
 
             {/* Migration Preview */}
-            {(selectedSource !== "" || selectedTarget !== "") && (
+            {(selectedSource && selectedTarget) && (
               <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-900">
                 <h4 className="font-medium mb-3">Migration Summary</h4>
                 <div className="space-y-2 text-sm">
