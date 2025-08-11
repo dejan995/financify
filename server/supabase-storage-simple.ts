@@ -18,87 +18,208 @@ export class SupabaseStorage implements IStorage {
   }
 
   async initializeSchema(): Promise<void> {
-    console.log('Supabase schema ready - using serverless approach with automatic table creation');
+    console.log('Automatically creating Supabase tables using direct database connection...');
     
-    // For true automatic setup, we'll create tables on-demand when first accessed
-    // This is the most reliable approach that works with any Supabase configuration
     try {
-      await this.ensureUserTableExists();
-      console.log('Supabase initialization completed successfully');
+      // Use the underlying PostgreSQL connection to create tables directly
+      await this.createTablesDirectly();
+      console.log('All Supabase tables created automatically!');
     } catch (error) {
-      console.log('Schema initialization continuing - tables will be created on first use');
+      console.error('Direct table creation failed:', error);
+      throw error;
     }
   }
 
-  private async ensureUserTableExists(): Promise<void> {
-    // Try a simple operation to see if we can work with the users table
+  private async createTablesDirectly(): Promise<void> {
+    // Extract database URL from Supabase URL
+    const dbUrl = this.extractPostgreSQLUrl();
+    
+    if (!dbUrl) {
+      throw new Error('Could not extract PostgreSQL connection from Supabase URL');
+    }
+
+    console.log('Creating tables using direct PostgreSQL connection...');
+    
+    // Use the @neondatabase/serverless driver to connect directly
+    const { neon } = await import('@neondatabase/serverless');
+    const sql = neon(dbUrl);
+    
     try {
-      await this.client.from('users').select('id').limit(1);
-      console.log('Users table is accessible');
-    } catch (error: any) {
-      if (error.code === '42P01') {
-        console.log('Users table needs to be created - will create via dashboard integration');
-        
-        // Generate the exact SQL the user needs to run in their Supabase SQL Editor
-        const sqlToRun = this.generateSetupSQL();
-        
-        throw new Error(`
-Please run this SQL in your Supabase SQL Editor (one time only):
-
-${sqlToRun}
-
-After running this SQL, try the setup again. This is a one-time requirement for Supabase database setup.
-        `.trim());
+      // Create all tables in sequence
+      const createStatements = this.getCreateTableStatements();
+      
+      for (const statement of createStatements) {
+        console.log('Executing:', statement.split('\n')[0] + '...');
+        await sql(statement);
       }
+      
+      console.log('All tables created successfully via direct connection');
+    } catch (error) {
+      console.error('Direct table creation error:', error);
+      throw error;
     }
   }
 
-  private generateSetupSQL(): string {
-    return `-- Run this once in your Supabase SQL Editor
-CREATE TABLE IF NOT EXISTS users (
-  id bigserial PRIMARY KEY,
-  username varchar(50) UNIQUE NOT NULL,
-  email varchar(255) UNIQUE NOT NULL,
-  password_hash varchar(255) NOT NULL,
-  first_name varchar(100),
-  last_name varchar(100),
-  profile_image_url text,
-  role varchar(20) DEFAULT 'user',
-  is_active boolean DEFAULT true,
-  is_email_verified boolean DEFAULT false,
-  email_verification_token varchar(255),
-  password_reset_token varchar(255),
-  password_reset_expires timestamp,
-  last_login_at timestamp,
-  created_at timestamp DEFAULT now(),
-  updated_at timestamp DEFAULT now()
-);
+  private extractPostgreSQLUrl(): string | null {
+    // Convert Supabase URL to direct PostgreSQL connection
+    try {
+      const url = new URL(this.supabaseUrl);
+      const projectRef = url.hostname.split('.')[0];
+      
+      // Construct the direct PostgreSQL URL
+      // Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+      const dbHost = `db.${projectRef}.supabase.co`;
+      
+      // Extract password from the Anonymous Key (it's encoded in the JWT)
+      // For direct connection, we'll use connection pooling approach
+      const connectionString = `postgresql://postgres.${projectRef}:${this.supabaseAnonKey}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`;
+      
+      return connectionString;
+    } catch (error) {
+      console.error('Failed to extract PostgreSQL URL:', error);
+      return null;
+    }
+  }
 
--- Create other required tables
-CREATE TABLE IF NOT EXISTS accounts (
-  id bigserial PRIMARY KEY,
-  user_id bigint REFERENCES users(id) NOT NULL,
-  name varchar(100) NOT NULL,
-  type varchar(20) NOT NULL,
-  balance decimal(15,2) DEFAULT 0.00,
-  currency varchar(3) DEFAULT 'USD',
-  is_active boolean DEFAULT true,
-  created_at timestamp DEFAULT now(),
-  updated_at timestamp DEFAULT now()
-);
+  private getCreateTableStatements(): string[] {
+    return [
+      `CREATE TABLE IF NOT EXISTS users (
+        id bigserial PRIMARY KEY,
+        username varchar(50) UNIQUE NOT NULL,
+        email varchar(255) UNIQUE NOT NULL,
+        password_hash varchar(255) NOT NULL,
+        first_name varchar(100),
+        last_name varchar(100),
+        profile_image_url text,
+        role varchar(20) DEFAULT 'user',
+        is_active boolean DEFAULT true,
+        is_email_verified boolean DEFAULT false,
+        email_verification_token varchar(255),
+        password_reset_token varchar(255),
+        password_reset_expires timestamp,
+        last_login_at timestamp,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+      
+      `CREATE TABLE IF NOT EXISTS accounts (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        name varchar(100) NOT NULL,
+        type varchar(20) NOT NULL,
+        balance decimal(15,2) DEFAULT 0.00,
+        currency varchar(3) DEFAULT 'USD',
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+      
+      `CREATE TABLE IF NOT EXISTS categories (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        name varchar(100) NOT NULL,
+        type varchar(10) NOT NULL,
+        color varchar(7) DEFAULT '#6366f1',
+        icon varchar(50),
+        parent_id bigint REFERENCES categories(id),
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+      
+      `CREATE TABLE IF NOT EXISTS transactions (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        account_id bigint REFERENCES accounts(id) NOT NULL,
+        category_id bigint REFERENCES categories(id),
+        amount decimal(15,2) NOT NULL,
+        description text,
+        date date NOT NULL,
+        type varchar(10) NOT NULL,
+        payee varchar(255),
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
 
-CREATE TABLE IF NOT EXISTS categories (
-  id bigserial PRIMARY KEY,
-  user_id bigint REFERENCES users(id) NOT NULL,
-  name varchar(100) NOT NULL,
-  type varchar(10) NOT NULL,
-  color varchar(7) DEFAULT '#6366f1',
-  icon varchar(50),
-  parent_id bigint REFERENCES categories(id),
-  is_active boolean DEFAULT true,
-  created_at timestamp DEFAULT now(),
-  updated_at timestamp DEFAULT now()
-);`;
+      `CREATE TABLE IF NOT EXISTS budgets (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        category_id bigint REFERENCES categories(id),
+        name varchar(100) NOT NULL,
+        amount decimal(15,2) NOT NULL,
+        period varchar(20) NOT NULL,
+        start_date date NOT NULL,
+        end_date date,
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS goals (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        name varchar(100) NOT NULL,
+        description text,
+        target_amount decimal(15,2) NOT NULL,
+        current_amount decimal(15,2) DEFAULT 0.00,
+        target_date date,
+        category varchar(50),
+        priority varchar(10) DEFAULT 'medium',
+        is_achieved boolean DEFAULT false,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS bills (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        account_id bigint REFERENCES accounts(id),
+        category_id bigint REFERENCES categories(id),
+        name varchar(100) NOT NULL,
+        amount decimal(15,2) NOT NULL,
+        due_date date NOT NULL,
+        frequency varchar(20) NOT NULL,
+        payee varchar(255),
+        is_autopay boolean DEFAULT false,
+        is_active boolean DEFAULT true,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS products (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        name varchar(255) NOT NULL,
+        brand varchar(100),
+        category varchar(100),
+        barcode varchar(50),
+        price decimal(10,2),
+        currency varchar(3) DEFAULT 'USD',
+        store varchar(100),
+        description text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS system_config (
+        id bigserial PRIMARY KEY,
+        key varchar(100) UNIQUE NOT NULL,
+        value text,
+        description text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      );`,
+
+      `CREATE TABLE IF NOT EXISTS activity_logs (
+        id bigserial PRIMARY KEY,
+        user_id bigint REFERENCES users(id) NOT NULL,
+        action varchar(50) NOT NULL,
+        resource varchar(100),
+        resource_id bigint,
+        timestamp timestamp DEFAULT now(),
+        details text
+      );`
+    ];
   }
 
   private async createUsersTable(): Promise<void> {
