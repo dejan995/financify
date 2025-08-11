@@ -317,6 +317,16 @@ export default function Admin() {
     queryKey: ["/api/admin/system/stats"],
   });
 
+  const { data: databaseConfigs } = useQuery<Array<{
+    id: string;
+    name: string;
+    provider: string;
+    isActive: boolean;
+    isConnected: boolean;
+  }>>({
+    queryKey: ["/api/admin/databases"],
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: (userId: number) => {
       return apiRequest("DELETE", `/api/admin/users/${userId}`);
@@ -590,7 +600,13 @@ export default function Admin() {
                     <Database className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">In Memory</div>
+                    <div className="text-2xl font-bold">
+                      {databaseConfigs && databaseConfigs.length > 0 
+                        ? databaseConfigs.find(db => db.isActive)?.provider?.charAt(0).toUpperCase() + 
+                          databaseConfigs.find(db => db.isActive)?.provider?.slice(1) || "Unknown"
+                        : "In Memory"
+                      }
+                    </div>
                     <p className="text-xs text-muted-foreground">Current storage mode</p>
                   </CardContent>
                 </Card>
