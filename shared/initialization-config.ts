@@ -19,6 +19,7 @@ export const initializationSchema = z.object({
     connectionString: z.string().optional(),
     supabaseUrl: z.string().optional(),
     supabaseAnonKey: z.string().optional(),
+    supabaseServiceKey: z.string().optional(),
   }),
 });
 

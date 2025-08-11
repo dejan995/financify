@@ -86,12 +86,12 @@ export class InitializationManager {
 
       // Handle Supabase differently
       if (config.provider === 'supabase') {
-        if (!config.supabaseUrl || !config.supabaseAnonKey) {
-          return { success: false, error: 'Supabase URL and Anonymous Key are required' };
+        if (!config.supabaseUrl || !config.supabaseAnonKey || !config.supabaseServiceKey) {
+          return { success: false, error: 'Supabase URL, Anonymous Key, and Service Role Key are all required' };
         }
         
         const { testSupabaseConnection } = await import('./supabase-client');
-        return await testSupabaseConnection(config.supabaseUrl, config.supabaseAnonKey);
+        return await testSupabaseConnection(config.supabaseUrl, config.supabaseAnonKey, config.supabaseServiceKey!);
       }
 
       // For other providers, test the connection
