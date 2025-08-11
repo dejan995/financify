@@ -689,19 +689,32 @@ export class MemStorage implements IStorage {
 }
 
 import { DatabaseStorage } from './database-storage';
+import { SQLiteStorage } from './sqlite-storage';
 import { databaseManager } from './database-manager';
 
-// Initialize storage based on active database configuration
+// Initialize storage based on environment and active database configuration
 function initializeStorage(): IStorage {
+  // Check for explicit memory storage flag
+  if (process.env.USE_MEMORY_STORAGE === 'true') {
+    console.log('Using in-memory storage');
+    return new MemStorage();
+  }
+
+  // Force SQLite to avoid WebSocket issues with Neon
+  // Check for active database configuration from database manager
   const activeConfig = databaseManager.getActiveConnection();
-  
-  if (activeConfig && process.env.DATABASE_URL) {
+  if (activeConfig && activeConfig.provider !== 'neon') {
     console.log(`Using database storage with ${activeConfig.provider}`);
-    return new DatabaseStorage(activeConfig.connectionString);
+    if (activeConfig.provider === 'sqlite') {
+      return new SQLiteStorage(activeConfig.connectionString.replace('file:', ''));
+    } else if (activeConfig.provider === 'postgresql' && !activeConfig.connectionString.includes('neon')) {
+      return new DatabaseStorage(activeConfig.connectionString);
+    }
   }
   
-  console.log('Using in-memory storage');
-  return new MemStorage();
+  // Default to SQLite storage (avoid Neon WebSocket issues)
+  console.log('Using SQLite database storage (default - avoiding WebSocket issues)');
+  return new SQLiteStorage('./data/finance.db');
 }
 
 export const storage = initializeStorage();
