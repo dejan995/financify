@@ -735,7 +735,33 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
     return storageInstance;
   }
 
-  // Use forced provider if specified (from wizard)
+  // Priority 1: Environment variables (for Docker deployment)
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_KEY) {
+    console.log('Using Supabase storage from environment variables');
+    const { SupabaseStorageNew } = await import('./supabase-storage-new');
+    storageInstance = new SupabaseStorageNew(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY,
+      process.env.SUPABASE_SERVICE_KEY
+    );
+    
+    try {
+      await storageInstance.initializeSchema();
+      console.log('✓ Supabase storage from environment variables initialized successfully');
+    } catch (error) {
+      console.error('Supabase schema initialization failed:', error);
+    }
+    
+    return storageInstance;
+  }
+
+  if (process.env.DATABASE_URL) {
+    console.log('Using PostgreSQL storage from environment variables');
+    storageInstance = new DatabaseStorage(process.env.DATABASE_URL);
+    return storageInstance;
+  }
+
+  // Priority 2: Use forced provider if specified (from wizard)
   if (forceProvider) {
     if (forceProvider === 'sqlite') {
       console.log('Initializing SQLite storage from wizard selection');
@@ -791,17 +817,7 @@ async function initializeStorage(forceProvider?: string, configPath?: string): P
     }
   }
 
-  // Check for active database configuration from database manager
-  const activeConfig = databaseManager.getActiveConnection();
-  if (activeConfig && activeConfig.provider !== 'neon') {
-    console.log(`Using database storage with ${activeConfig.provider}`);
-    if (activeConfig.provider === 'sqlite') {
-      storageInstance = new SQLiteStorage(activeConfig.connectionString.replace('file:', ''));
-    } else if (activeConfig.provider === 'postgresql' && !activeConfig.connectionString.includes('neon')) {
-      storageInstance = new DatabaseStorage(activeConfig.connectionString);
-    }
-    return storageInstance!;
-  }
+  // Priority 3: Check for saved configuration files (fallback)
   
   // If no configuration exists and no force provider, use memory storage temporarily
   console.log('No database configuration found - using temporary memory storage until initialization');
@@ -814,23 +830,50 @@ class StorageProxy implements IStorage {
   private async getStorage(): Promise<IStorage> {
     if (!storageInstance) {
       console.log('[StorageProxy] Storage not initialized, checking status...');
+      
+      // Priority 1: Environment variables (for Docker deployment)
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_KEY) {
+        console.log('[StorageProxy] Using Supabase storage from environment variables');
+        const { SupabaseStorageNew } = await import('./supabase-storage-new');
+        storageInstance = new SupabaseStorageNew(
+          process.env.SUPABASE_URL,
+          process.env.SUPABASE_ANON_KEY,
+          process.env.SUPABASE_SERVICE_KEY
+        );
+        
+        try {
+          await storageInstance.initializeSchema();
+          console.log('[StorageProxy] ✓ Supabase storage from environment variables initialized successfully');
+        } catch (error) {
+          console.error('[StorageProxy] Supabase schema initialization failed:', error);
+        }
+        
+        return storageInstance;
+      }
+
+      if (process.env.DATABASE_URL) {
+        console.log('[StorageProxy] Using PostgreSQL storage from environment variables');
+        storageInstance = new DatabaseStorage(process.env.DATABASE_URL);
+        return storageInstance;
+      }
+      
+      // Priority 2: Check initialization status for saved configs
       const isInitialized = checkInitializationStatus();
       console.log('[StorageProxy] Initialization status:', isInitialized);
       
       if (isInitialized) {
-        console.log('[StorageProxy] App is initialized, directly restoring Supabase storage...');
+        console.log('[StorageProxy] App is initialized, restoring saved storage configuration...');
         
         try {
-          // Direct Supabase restoration without going through complex initialization
           const config = initializationManager.getInitializationStatus();
           if (config.database?.provider === 'supabase') {
-            console.log('[StorageProxy] Loading Supabase credentials...');
+            console.log('[StorageProxy] Loading saved Supabase credentials...');
             const { databaseConfigManager } = await import('./database-config-manager');
             const dbConfigs = await databaseConfigManager.getAllConfigs();
             const supabaseConfig = dbConfigs.find((cfg: any) => cfg.provider === 'supabase');
             
             if (supabaseConfig) {
-              console.log('[StorageProxy] Found Supabase config, initializing...');
+              console.log('[StorageProxy] Found saved Supabase config, initializing...');
               const { SupabaseStorageNew } = await import('./supabase-storage-new');
               storageInstance = new SupabaseStorageNew(
                 supabaseConfig.supabaseUrl!,
@@ -838,7 +881,6 @@ class StorageProxy implements IStorage {
                 supabaseConfig.supabaseServiceKey!
               );
               
-              // Initialize schema to create tables if they don't exist
               try {
                 await storageInstance.initializeSchema();
                 console.log('[StorageProxy] ✓ Supabase schema initialization completed');
@@ -848,7 +890,7 @@ class StorageProxy implements IStorage {
               
               console.log('[StorageProxy] ✓ Supabase storage successfully restored');
             } else {
-              console.log('[StorageProxy] No Supabase config found, using memory storage');
+              console.log('[StorageProxy] No saved Supabase config found, using memory storage');
               storageInstance = new MemStorage();
             }
           } else {

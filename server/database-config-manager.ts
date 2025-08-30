@@ -12,10 +12,13 @@ class DatabaseConfigManager {
 
   private loadConfigs() {
     try {
-      if (existsSync(this.configFilePath)) {
+      // First, check for environment variable configuration
+      this.loadFromEnvironment();
+      
+      // Then load from file if no env config exists
+      if (this.configs.size === 0 && existsSync(this.configFilePath)) {
         const data = readFileSync(this.configFilePath, 'utf-8');
         const configs: DatabaseConfig[] = JSON.parse(data);
-        this.configs.clear();
         configs.forEach(config => {
           this.configs.set(config.id, config);
         });
@@ -51,6 +54,44 @@ class DatabaseConfigManager {
   async deleteConfig(id: string): Promise<void> {
     this.configs.delete(id);
     this.saveConfigs();
+  }
+
+  private loadFromEnvironment() {
+    // Check for Supabase environment variables
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_KEY) {
+      const envConfig: DatabaseConfig = {
+        id: 'env-supabase',
+        name: 'Environment Supabase',
+        provider: 'supabase',
+        supabaseUrl: process.env.SUPABASE_URL,
+        supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+        supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
+        isActive: true,
+        isConnected: true,
+        ssl: true,
+        maxConnections: 10,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.configs.set(envConfig.id, envConfig);
+    }
+    
+    // Check for PostgreSQL environment variables
+    if (process.env.DATABASE_URL) {
+      const envConfig: DatabaseConfig = {
+        id: 'env-postgres',
+        name: 'Environment PostgreSQL',
+        provider: 'postgresql',
+        connectionString: process.env.DATABASE_URL,
+        isActive: true,
+        isConnected: true,
+        ssl: true,
+        maxConnections: 10,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.configs.set(envConfig.id, envConfig);
+    }
   }
 
   async getActiveConfig(): Promise<DatabaseConfig | undefined> {

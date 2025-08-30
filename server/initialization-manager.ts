@@ -38,6 +38,11 @@ export class InitializationManager {
 
   // Check if application has been initialized
   public isInitialized(): boolean {
+    // If environment variables are present, consider the app initialized
+    if (this.hasEnvironmentConfig()) {
+      return true;
+    }
+
     if (!existsSync(this.configPath)) {
       return false;
     }
@@ -50,8 +55,50 @@ export class InitializationManager {
     }
   }
 
+  // Check if environment variables provide a complete configuration
+  private hasEnvironmentConfig(): boolean {
+    // Check for Supabase environment variables
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_KEY) {
+      return true;
+    }
+    
+    // Check for PostgreSQL environment variable
+    if (process.env.DATABASE_URL) {
+      return true;
+    }
+    
+    return false;
+  }
+
   // Get current initialization status
   public getInitializationStatus(): InitializationConfig {
+    // If environment variables are present, return environment-based config
+    if (this.hasEnvironmentConfig()) {
+      const envConfig: InitializationConfig = {
+        isInitialized: true,
+        database: {
+          provider: process.env.SUPABASE_URL ? 'supabase' : 'postgresql',
+          name: 'Environment Database',
+          configId: process.env.SUPABASE_URL ? 'env-supabase' : 'env-postgres',
+        },
+        createdAt: new Date(),
+      };
+      
+      // Include admin user info if available from saved config
+      if (existsSync(this.configPath)) {
+        try {
+          const savedConfig: InitializationConfig = JSON.parse(readFileSync(this.configPath, 'utf8'));
+          if (savedConfig.adminUser) {
+            envConfig.adminUser = savedConfig.adminUser;
+          }
+        } catch (error) {
+          // Ignore errors reading saved config when using environment variables
+        }
+      }
+      
+      return envConfig;
+    }
+
     if (!existsSync(this.configPath)) {
       return { isInitialized: false };
     }
