@@ -81,38 +81,61 @@ A comprehensive personal finance management application built with modern full-s
 
 ## 🛠 Technology Stack
 
-### Frontend
-- **React 18** - Modern component-based UI framework
-- **TypeScript** - Type-safe JavaScript development
-- **Tailwind CSS** - Utility-first CSS framework
-- **Radix UI** - Accessible component primitives
-- **shadcn/ui** - Beautiful component library
-- **TanStack React Query** - Powerful data fetching and caching
+### Frontend Architecture
+- **React 18** - Modern component-based UI framework with TypeScript
 - **Wouter** - Minimalist client-side routing
-- **Recharts** - Composable charting library
-- **Vite** - Fast development build tool
+- **TanStack React Query** - Server state management and caching
+- **Radix UI** - Accessible component primitives with shadcn/ui design system
+- **Tailwind CSS** - Utility-first CSS framework with CSS variables for theming
+- **Vite** - Fast development build tool with hot module replacement
+- **Recharts** - Composable charting library for data visualization
 
-### Backend
-- **Node.js** - JavaScript runtime
-- **Express.js** - Web application framework
-- **TypeScript** - Server-side type safety
-- **Drizzle ORM** - Type-safe database operations
-- **Zod** - Schema validation library
-- **Passport.js** - Authentication middleware
-- **Express Session** - Session management
+### Backend Architecture
+- **Node.js** - JavaScript runtime with Express.js web framework
+- **TypeScript** - End-to-end type safety with server-side implementation
+- **Drizzle ORM** - Type-safe database operations with PostgreSQL dialect
+- **Zod** - Schema validation library for request/response validation
+- **Passport.js** - Authentication middleware with session management
+- **Express Session** - Secure session handling with configurable storage
 
-### Database Support
-- **PostgreSQL** - Primary production database
-- **Supabase** - Cloud PostgreSQL with real-time features
-- **SQLite** - Development and lightweight deployments
-- **Neon Database** - Serverless PostgreSQL option
+### Database Support & Schema
+- **PostgreSQL** - Primary production database with full feature support
+- **Supabase** - Cloud PostgreSQL with real-time features and automatic schema creation
+- **SQLite** - Development database with automatic file generation
+- **Neon Database** - Serverless PostgreSQL option for cloud deployments
+
+#### Core Database Tables
+- **Users**: Authentication, profiles, and role-based access control
+- **Accounts**: Multi-account support (checking, savings, credit, investment)
+- **Categories**: Hierarchical expense/income categorization with color coding
+- **Transactions**: Core financial transactions with rich metadata and filtering
+- **Budgets**: Category-based budget tracking with configurable time periods
+- **Goals**: Financial goal setting with progress tracking and target dates
+- **Bills**: Recurring bill management with reminders and payment tracking
+- **Products**: Scanned product database for receipt processing and quick entry
 
 ### Development & Deployment
-- **Docker** - Containerization platform
-- **Docker Compose** - Multi-container orchestration
-- **Nginx** - Reverse proxy and load balancer
-- **ESBuild** - Fast JavaScript bundler
-- **Hot Module Replacement** - Instant development updates
+- **Docker** - Complete containerization with multi-stage builds
+- **Docker Compose** - Multi-container orchestration for development and production
+- **Nginx** - Reverse proxy, load balancer, and SSL termination
+- **ESBuild** - Fast JavaScript bundling for production optimization
+- **Hot Module Replacement** - Instant development updates with Vite integration
+
+### Key Design Decisions
+- **Monorepo Structure**: Shared schema and types between client and server
+- **Type Safety**: End-to-end TypeScript with Zod validation
+- **Modern UI**: Component-based architecture with accessible design patterns
+- **Performance**: Query optimization with React Query caching and database indexes
+- **Responsive Design**: Mobile-first approach with adaptive sidebar layout
+- **Security**: Session-based authentication with scrypt password hashing
+- **Scalability**: Docker containerization with horizontal scaling support
+
+### Data Flow Architecture
+1. **User Input**: Forms with React Hook Form and Zod validation
+2. **API Requests**: TanStack React Query for optimized server communication
+3. **Database Operations**: Drizzle ORM with type-safe queries
+4. **Real-time Updates**: Query invalidation for immediate UI updates
+5. **Error Handling**: Centralized error management with toast notifications
 
 ## 📁 Project Structure
 
@@ -411,17 +434,48 @@ npm run db:migrate
 ### Recent Updates
 
 #### January 2025 - System Stabilization & Docker Support
-- **Codebase Cleanup**: Removed complex database migration system causing LSP errors
-- **Docker Integration**: Complete containerization with production optimizations
-- **Multi-stage Builds**: Optimized Docker images for production deployment
-- **Health Monitoring**: Added comprehensive health checks and monitoring
-- **Security Enhancements**: Improved authentication and session management
-- **Documentation**: Complete deployment guides and API documentation
+- **Codebase Cleanup**: Removed complex database migration system that was causing critical LSP errors and system instability
+- **Eliminated SQLite storage implementation** that had compatibility issues with the main PostgreSQL schema
+- **Cleaned up database manager** references across all server files to improve system reliability  
+- **Simplified database testing** in initialization wizard for improved stability
+- **Fixed all LSP diagnostics** - codebase now has zero TypeScript errors
+- **Maintained core functionality** while removing problematic migration features
 
-#### Previous Versions
-- **August 2025**: Added Supabase integration and automatic schema initialization
-- **July 2025**: Implemented custom authentication system with role-based access
-- **Initial Release**: Core financial tracking functionality with React frontend
+#### Docker Deployment Setup
+- **Created production-ready Dockerfile** with multi-stage builds for optimized image size
+- **Added comprehensive docker-compose.yml** with PostgreSQL, Redis, and application services
+- **Configured environment variables** for flexible deployment across different environments
+- **Added development overrides** for hot-reload development with Docker
+- **Included security best practices** and production deployment guidelines
+- **Created backup and monitoring strategies** for production deployments
+
+#### Documentation & Project Finalization
+- **Created comprehensive README.md** covering all aspects of the application
+- **Documented complete technology stack** and architecture decisions
+- **Added detailed API documentation** with all endpoints and usage examples
+- **Included security guidelines** and best practices for production deployment
+- **Provided troubleshooting guides** and performance optimization tips
+- **Created complete development workflow** documentation for contributors
+
+#### Previous Major Updates
+- **August 2025**: Added Supabase integration and automatic schema initialization - users now only need to provide Supabase URL and API key, database tables are created automatically without any manual SQL execution required
+- **August 2025**: Simplified Supabase integration to work with existing public schema - automatic table creation during first use, no manual SQL required, leverages Supabase's default schema structure
+- **August 2025**: Fixed broken CRUD operations throughout the application - resolved "storage2.getUser is not a function" errors by implementing missing getUser method in SupabaseStorageNew class and proper storage configuration restoration
+- **August 2025**: Enhanced admin interface database status detection to properly show "Supabase" instead of "In Memory" when using Supabase storage
+- **August 2025**: Implemented automatic Supabase table creation for all required database tables (accounts, categories, transactions, budgets, goals, bills, products) to prevent "relation does not exist" errors
+- **August 2025**: Fixed session deserialization errors by adding proper error handling and storage availability checks in authentication system
+- **July 2025**: Implemented custom authentication system with role-based access - replaced Replit authentication with custom user management system featuring scrypt password hashing, session-based authentication, role-based access control, and comprehensive user registration/login functionality
+- **July 2025**: Fixed authentication system issues - corrected password hashing consistency between admin user creation and login authentication, added confirmPassword validation to registration form
+- **July 2025**: Added Categories and Products management pages to sidebar navigation
+- **July 2025**: Fixed comprehensive theming system with text-danger to text-destructive replacement
+- **July 2025**: Improved color contrast: darker green in light mode, lighter red in dark mode
+- **January 2025**: Fixed navigation sidebar visibility - sidebar now only appears for authenticated users, login page displays without navigation for better user experience
+
+#### System Architecture Decisions
+- **WordPress-style initialization wizard** with proper database connection testing - users can now test database connections before proceeding, preventing WebSocket failures and providing clear feedback on connectivity issues
+- **Restructured database initialization** to prevent WebSocket connectivity issues - app now uses memory storage for cloud providers until connection is verified, eliminating silent failures and providing proper user feedback
+- **Successfully implemented SQLite as default database** to resolve Neon WebSocket connectivity issues - created comprehensive SQLite storage implementation with automatic database file generation, proper schema management, and full interface compatibility
+- **Fixed admin user update functionality** - resolved password validation error when updating users without changing passwords by filtering empty password fields
 
 ## 🔧 Troubleshooting
 
@@ -492,6 +546,20 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Tailwind CSS** for the utility-first CSS framework
 - **shadcn/ui** for the beautiful component library
 - **Open Source Community** for the countless libraries that make this project possible
+
+## Development Philosophy
+
+This project follows modern full-stack development principles with a focus on:
+- **User Experience**: Clean, intuitive interface with responsive design
+- **Developer Experience**: Type safety, hot reloading, and comprehensive tooling
+- **Production Ready**: Docker deployment, health monitoring, and scalability
+- **Security First**: Secure authentication, input validation, and data protection
+- **Performance**: Optimized queries, caching strategies, and efficient bundling
+
+## User Preferences
+- **Communication Style**: Simple, everyday language for non-technical users
+- **Design Approach**: Mobile-first responsive design with accessibility
+- **Development Workflow**: Hot module replacement with comprehensive error handling
 
 ---
 
