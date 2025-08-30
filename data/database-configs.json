@@ -1,16 +1,1 @@
-[
-  {
-    "id": "supabase-1754939998004",
-    "name": "Main Database",
-    "provider": "supabase",
-    "supabaseUrl": "https://mcgtadirsdrsuzpmmcvy.supabase.co",
-    "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZ3RhZGlyc2Ryc3V6cG1tY3Z5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NjM5MDYsImV4cCI6MjA2NzEzOTkwNn0.3fXwJPL9Q_xa5Lvy4pmM6nmLSDsmlWDqbcf1Rrxfdt8",
-    "supabaseServiceKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jZ3RhZGlyc2Ryc3V6cG1tY3Z5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTU2MzkwNiwiZXhwIjoyMDY3MTM5OTA2fQ.5X0_cuDbeofXwI4RlMvceD0c_glWQLvdcgZv1i1lw9k",
-    "isActive": true,
-    "isConnected": true,
-    "ssl": true,
-    "maxConnections": 10,
-    "createdAt": "2025-08-11T19:19:58.004Z",
-    "updatedAt": "2025-08-11T19:19:58.004Z"
-  }
-]
+[]
