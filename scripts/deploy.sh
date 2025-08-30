@@ -68,7 +68,7 @@ setup_environment() {
     
     if [ ! -f .env ]; then
         print_status "Creating .env file from template..."
-        cp .env.example .env
+        cp ./.env.example .env
         
         # Generate session secret
         SESSION_SECRET=$(generate_session_secret)
