@@ -1,204 +1,654 @@
 # Docker Deployment Guide
 
-This guide explains how to deploy the Personal Finance Tracker application using Docker.
+This guide provides comprehensive instructions for deploying the Personal Finance Tracker using Docker and Docker Compose.
+
+## Overview
+
+The application is fully containerized with support for:
+- **Development**: Hot reload, debugging, and local development
+- **Production**: Optimized builds, SSL/TLS, load balancing, and monitoring
+- **Multi-Database**: PostgreSQL, Supabase, and SQLite support
+- **Scalability**: Horizontal scaling with load balancer support
+
+## Prerequisites
+
+### System Requirements
+- **Docker**: 20.10+ 
+- **Docker Compose**: 2.0+
+- **RAM**: 2GB minimum, 4GB recommended
+- **Storage**: 10GB available space
+- **CPU**: 2 cores recommended
+
+### Required Files
+- `Dockerfile` - Application container definition
+- `docker-compose.yml` - Development orchestration
+- `docker-compose.prod.yml` - Production overrides
+- `nginx.conf` - Reverse proxy configuration
+- `.env` - Environment configuration
 
 ## Quick Start
 
-### 1. Using Docker Compose (Recommended)
-
+### Development Deployment
 ```bash
-# Clone the repository
-git clone <your-repo-url>
+# Clone and navigate to project
+git clone <repository-url>
 cd finance-tracker
 
-# Copy environment file and configure
-cp .env.example .env
-nano .env  # Edit with your configuration
+# Start development environment
+./deploy.sh dev
 
-# Build and start all services
+# Or manually with docker-compose
 docker-compose up -d
-
-# View logs
-docker-compose logs -f finance-app
 ```
 
-The application will be available at `http://localhost:5000`
-
-### 2. Using Docker Only
-
+### Production Deployment
 ```bash
-# Build the image
-docker build -t finance-tracker .
+# Configure production environment
+cp .env.example .env.production
+# Edit .env.production with your values
+
+# Deploy production stack
+./deploy.sh prod
+
+# Or manually with production compose
+docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+## Container Architecture
+
+### Application Stack
+
+```
+┌─────────────────┐
+│     Nginx       │  ← Reverse Proxy / SSL Termination
+│   (Production)  │
+└─────────────────┘
+         │
+┌─────────────────┐
+│ Finance Tracker │  ← Node.js Application
+│   Application   │
+└─────────────────┘
+         │
+┌─────────────────┐    ┌─────────────────┐
+│   PostgreSQL    │    │      Redis      │  ← Session Store
+│   (Optional)    │    │   (Optional)    │
+└─────────────────┘    └─────────────────┘
+```
+
+### Service Definitions
+
+#### finance-app
+```yaml
+services:
+  finance-app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./:/app
+      - /app/node_modules
+```
+
+#### postgres (Optional)
+```yaml
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=finance_tracker
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+```
+
+#### nginx (Production)
+```yaml
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/ssl/certs
+```
+
+## Environment Configuration
+
+### Development (.env)
+```env
+NODE_ENV=development
+PORT=5000
+SESSION_SECRET=your-session-secret-key
+
+# Database Configuration (choose one)
+# Supabase (Recommended for cloud)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
+
+# PostgreSQL
+# DATABASE_URL=postgresql://postgres:password@postgres:5432/finance_tracker
+
+# SQLite (automatic in development)
+# No configuration needed
+```
+
+### Production (.env.production)
+```env
+NODE_ENV=production
+PORT=5000
+SESSION_SECRET=your-strong-session-secret
+
+# Production Database
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
+
+# SSL Configuration
+SSL_CERT_PATH=/etc/ssl/certs/fullchain.pem
+SSL_KEY_PATH=/etc/ssl/private/privkey.pem
+
+# Domain Configuration
+DOMAIN=your-domain.com
+```
+
+## Dockerfile Structure
+
+### Multi-Stage Build
+```dockerfile
+# Build Stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Production Stage  
+FROM node:20-alpine AS production
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+EXPOSE 5000
+CMD ["npm", "start"]
+```
+
+### Development Stage
+```dockerfile
+FROM node:20-alpine AS development
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+EXPOSE 5000
+CMD ["npm", "run", "dev"]
+```
+
+## Docker Compose Configurations
+
+### Development (docker-compose.yml)
+```yaml
+version: '3.8'
+services:
+  finance-app:
+    build:
+      context: .
+      target: development
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  # Optional PostgreSQL for development
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: finance_tracker
+      POSTGRES_USER: postgres  
+      POSTGRES_PASSWORD: devpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+```
+
+### Production (docker-compose.prod.yml)
+```yaml
+version: '3.8'
+services:
+  finance-app:
+    build:
+      context: .
+      target: production
+    environment:
+      - NODE_ENV=production
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/ssl/certs:ro
+    depends_on:
+      - finance-app
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+```
+
+## Deployment Scripts
+
+### Automated Deployment (deploy.sh)
+```bash
+#!/bin/bash
+set -e
+
+ENVIRONMENT=${1:-dev}
+
+echo "🚀 Deploying Personal Finance Tracker ($ENVIRONMENT)"
+
+if [ "$ENVIRONMENT" = "dev" ]; then
+    echo "📦 Starting development environment..."
+    docker-compose up -d --build
+    echo "✅ Development environment started on http://localhost:5000"
+    
+elif [ "$ENVIRONMENT" = "prod" ]; then
+    echo "🏭 Starting production environment..."
+    
+    # Check for production environment file
+    if [ ! -f ".env.production" ]; then
+        echo "❌ .env.production file not found"
+        exit 1
+    fi
+    
+    # Deploy production stack
+    docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.production up -d --build
+    
+    echo "✅ Production environment deployed"
+    echo "🔗 Application available at https://your-domain.com"
+    
+else
+    echo "❌ Invalid environment. Use 'dev' or 'prod'"
+    exit 1
+fi
+
+# Health check
+echo "🏥 Running health checks..."
+sleep 10
+curl -f http://localhost:5000/api/health || echo "⚠️  Health check failed"
+
+echo "🎉 Deployment complete!"
+```
+
+## SSL/TLS Configuration
+
+### SSL Certificate Setup
+```bash
+# Using Let's Encrypt with Certbot
+sudo apt install certbot
+sudo certbot certonly --standalone -d your-domain.com
+
+# Copy certificates to project
+mkdir -p ./ssl
+sudo cp /etc/letsencrypt/live/your-domain.com/fullchain.pem ./ssl/
+sudo cp /etc/letsencrypt/live/your-domain.com/privkey.pem ./ssl/
+sudo chown $USER:$USER ./ssl/*
+```
+
+### Nginx SSL Configuration
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+    
+    ssl_certificate /etc/ssl/certs/fullchain.pem;
+    ssl_certificate_key /etc/ssl/certs/privkey.pem;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+    
+    location / {
+        proxy_pass http://finance-app:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+## Database Integration
+
+### Supabase Configuration
+```bash
+# Set environment variables
+export SUPABASE_URL="https://your-project.supabase.co"
+export SUPABASE_ANON_KEY="your-anon-key"
+export SUPABASE_SERVICE_KEY="your-service-key"
 
 # Run with Supabase
-docker run -d \
-  --name finance-app \
-  -p 5000:5000 \
-  -e SUPABASE_URL=your-supabase-url \
-  -e SUPABASE_ANON_KEY=your-anon-key \
-  -e SUPABASE_SERVICE_KEY=your-service-key \
-  -e SESSION_SECRET=your-secret-key \
-  -v finance-data:/app/data \
-  finance-tracker
+docker-compose up -d
 ```
 
-## Configuration Options
-
-### Database Configuration
-
-Choose one of these database options:
-
-#### Option 1: Supabase (Cloud - Recommended)
-```env
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-role-key
-```
-
-#### Option 2: External PostgreSQL
-```env
-DATABASE_URL=postgresql://username:password@host:5432/database_name
-```
-
-#### Option 3: Docker Compose PostgreSQL
-The included `postgres` service will automatically provide a database when using `docker-compose up`.
-
-### Environment Variables
-
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `SUPABASE_URL` | Supabase project URL | If using Supabase | - |
-| `SUPABASE_ANON_KEY` | Supabase anonymous key | If using Supabase | - |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key | If using Supabase | - |
-| `DATABASE_URL` | PostgreSQL connection string | If using external PostgreSQL | - |
-| `SESSION_SECRET` | Secret key for sessions | Yes | finance-app-secret-key |
-| `NODE_ENV` | Environment mode | No | production |
-| `PORT` | Application port | No | 5000 |
-
-## Docker Compose Services
-
-### finance-app
-- **Purpose**: Main application server
-- **Port**: 5000
-- **Volumes**: `finance-data:/app/data` for persistent storage
-- **Dependencies**: postgres (if using included database)
-
-### postgres
-- **Purpose**: PostgreSQL database (optional)
-- **Port**: 5432
-- **Volumes**: `postgres-data:/var/lib/postgresql/data`
-- **Auto-initialization**: Creates tables using `supabase-setup.sql`
-
-### redis
-- **Purpose**: Session storage (optional, for scaling)
-- **Port**: 6379
-- **Volumes**: `redis-data:/data`
-
-## Production Deployment
-
-### Security Considerations
-
-1. **Change default secrets**:
-   ```bash
-   # Generate a secure session secret
-   openssl rand -base64 32
-   ```
-
-2. **Use environment-specific `.env` files**:
-   ```bash
-   cp .env.example .env.production
-   # Edit .env.production with production values
-   docker-compose --env-file .env.production up -d
-   ```
-
-3. **Enable SSL/TLS** with a reverse proxy like Nginx or Traefik
-
-4. **Regular backups**:
-   ```bash
-   # Backup PostgreSQL data
-   docker-compose exec postgres pg_dump -U finance_user finance_db > backup.sql
-   
-   # Backup application data
-   docker run --rm -v finance_data:/data -v $(pwd):/backup ubuntu tar czf /backup/data-backup.tar.gz -C /data .
-   ```
-
-### Scaling
-
-To scale the application:
-
+### PostgreSQL Setup
 ```yaml
-# docker-compose.override.yml
-version: '3.8'
+# docker-compose.yml addition
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: finance_tracker
+      POSTGRES_USER: financeuser
+      POSTGRES_PASSWORD: secure_db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
+```
+
+### Database Initialization
+```sql
+-- init.sql
+CREATE DATABASE finance_tracker;
+CREATE USER financeuser WITH PASSWORD 'secure_db_password';
+GRANT ALL PRIVILEGES ON DATABASE finance_tracker TO financeuser;
+```
+
+## Monitoring & Logging
+
+### Health Checks
+```yaml
+# Add to service definition
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+```
+
+### Log Management
+```bash
+# View application logs
+docker-compose logs -f finance-app
+
+# View specific service logs
+docker-compose logs nginx
+
+# Log rotation setup
+# Add to docker-compose.yml
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+```
+
+### Monitoring Stack
+```yaml
+# Optional monitoring services
+services:
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+```
+
+## Backup & Recovery
+
+### Database Backup
+```bash
+# PostgreSQL backup
+docker-compose exec postgres pg_dump -U financeuser finance_tracker > backup.sql
+
+# Restore from backup
+docker-compose exec -T postgres psql -U financeuser finance_tracker < backup.sql
+
+# Automated backup script
+#!/bin/bash
+BACKUP_DIR="/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+docker-compose exec postgres pg_dump -U financeuser finance_tracker > "$BACKUP_DIR/finance_tracker_$DATE.sql"
+```
+
+### Volume Backup
+```bash
+# Backup Docker volumes
+docker run --rm -v finance_tracker_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz /data
+
+# Restore Docker volumes
+docker run --rm -v finance_tracker_postgres_data:/data -v $(pwd):/backup alpine tar xzf /backup/postgres_backup.tar.gz -C /
+```
+
+## Scaling & Performance
+
+### Horizontal Scaling
+```yaml
+# docker-compose.scale.yml
 services:
   finance-app:
     deploy:
       replicas: 3
-    depends_on:
-      - postgres
-      - redis
+    
+  nginx:
+    volumes:
+      - ./nginx.lb.conf:/etc/nginx/nginx.conf
 ```
 
-### Health Checks
+### Load Balancer Configuration
+```nginx
+upstream finance_app {
+    server finance-app_1:5000;
+    server finance-app_2:5000;
+    server finance-app_3:5000;
+}
 
-The application includes health check endpoints:
-- `GET /api/health` - Application health
-- `GET /api/initialization/status` - Initialization status
+server {
+    listen 80;
+    location / {
+        proxy_pass http://finance_app;
+    }
+}
+```
 
-## Development
+### Performance Tuning
+```dockerfile
+# Dockerfile optimizations
+FROM node:20-alpine AS production
 
-For development with hot reload:
+# Add performance configurations
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NODE_ENV=production
 
-```bash
-# Use the development override
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+# Use PM2 for production process management
+RUN npm install -g pm2
+CMD ["pm2-runtime", "start", "ecosystem.config.js"]
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Port conflicts**: Change ports in docker-compose.yml
-2. **Database connection**: Verify environment variables
-3. **Permissions**: Ensure data directories have correct permissions
-4. **Memory issues**: Increase Docker memory limits
-
-### Logs
-
+#### Port Already in Use
 ```bash
-# View all logs
-docker-compose logs
+# Find and kill processes using port 5000
+sudo lsof -ti:5000 | xargs sudo kill -9
 
-# View specific service logs
-docker-compose logs finance-app
+# Or use different port
+PORT=5001 docker-compose up -d
+```
+
+#### Database Connection Issues
+```bash
+# Check database container status
+docker-compose ps postgres
+
+# View database logs
 docker-compose logs postgres
 
-# Follow logs in real-time
-docker-compose logs -f finance-app
+# Test database connection
+docker-compose exec postgres psql -U financeuser -d finance_tracker -c "SELECT version();"
 ```
 
-### Cleanup
-
+#### SSL Certificate Issues
 ```bash
-# Stop all services
-docker-compose down
+# Verify certificate files
+ls -la ./ssl/
+openssl x509 -in ./ssl/fullchain.pem -text -noout
 
-# Remove volumes (WARNING: This deletes all data)
-docker-compose down -v
-
-# Remove images
-docker-compose down --rmi all
+# Test SSL configuration
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
 ```
 
-## Monitoring
+### Debug Mode
+```yaml
+# Enable debug mode
+services:
+  finance-app:
+    environment:
+      - DEBUG=*
+      - LOG_LEVEL=debug
+    volumes:
+      - .:/app
+    command: npm run dev
+```
 
-For production monitoring, consider adding:
-- Prometheus metrics
-- Grafana dashboards  
-- Log aggregation (ELK stack)
-- Uptime monitoring
+### Log Analysis
+```bash
+# Follow all logs
+docker-compose logs -f
 
-## Backup Strategy
+# Filter logs by service
+docker-compose logs finance-app | grep ERROR
 
-1. **Database backups**: Schedule regular PostgreSQL dumps
-2. **Application data**: Backup the `/app/data` volume
-3. **Configuration**: Keep `.env` files in secure version control
+# Export logs
+docker-compose logs --no-color > application.log
+```
+
+## Security Best Practices
+
+### Container Security
+```dockerfile
+# Run as non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+USER nodejs
+```
+
+### Network Security
+```yaml
+# Create isolated networks
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+```
+
+### Secret Management
+```bash
+# Use Docker secrets in production
+echo "strong_session_secret" | docker secret create session_secret -
+```
+
+## Production Checklist
+
+- [ ] Environment variables configured
+- [ ] SSL certificates installed and valid
+- [ ] Database backups scheduled
+- [ ] Health checks enabled
+- [ ] Log rotation configured
+- [ ] Monitoring setup (optional)
+- [ ] Firewall rules configured
+- [ ] DNS records pointing to server
+- [ ] Load balancer configured (if scaling)
+- [ ] Security headers configured in Nginx
+
+## Maintenance
+
+### Regular Tasks
+```bash
+# Update containers
+docker-compose pull
+docker-compose up -d
+
+# Clean up unused resources
+docker system prune -a
+
+# Monitor disk usage
+docker system df
+
+# Backup database (weekly)
+./scripts/backup.sh
+```
+
+### Updates
+```bash
+# Rolling update strategy
+docker-compose up -d --no-deps finance-app
+
+# Zero-downtime deployment with health checks
+./scripts/deploy-rolling.sh
+```
+
+## Support
+
+For deployment issues:
+
+1. **Check logs**: `docker-compose logs service-name`
+2. **Verify configuration**: Review environment variables and compose files
+3. **Test connectivity**: Use `docker-compose exec service-name sh` to debug
+4. **Review resources**: Monitor CPU, memory, and disk usage
+5. **Consult documentation**: Refer to [README.md](README.md) for general issues
+
+---
+
+**Docker deployment made simple** 🐳
+
+For more information, visit the [main documentation](README.md) or open an issue on GitHub.
