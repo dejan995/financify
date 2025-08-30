@@ -50,15 +50,15 @@ export default function BudgetProgress() {
 
   // Calculate spending for each budget
   const currentMonth = new Date().toISOString().slice(0, 7);
-  const monthlyTransactions = (transactions || []).filter(t => 
+  const monthlyTransactions = (transactions as any[] || []).filter((t: any) => 
     t.type === "expense" && t.date.startsWith(currentMonth)
   );
 
-  const budgetProgress = (budgets || []).map(budget => {
-    const category = (categories || []).find(c => c.id === budget.categoryId);
+  const budgetProgress = (budgets as any[] || []).map((budget: any) => {
+    const category = (categories as any[] || []).find((c: any) => c.id === budget.categoryId);
     const spent = monthlyTransactions
-      .filter(t => t.categoryId === budget.categoryId)
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      .filter((t: any) => t.categoryId === budget.categoryId)
+      .reduce((sum: number, t: any) => sum + parseFloat(t.amount), 0);
     
     const budgetAmount = parseFloat(budget.amount);
     const percentage = calculatePercentage(spent, budgetAmount);
@@ -87,7 +87,7 @@ export default function BudgetProgress() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {budgetProgress.length > 0 ? budgetProgress.map((item) => (
+          {budgetProgress.length > 0 ? budgetProgress.map((item: any) => (
             <div key={item.id} className="border-b border-gray-100 pb-4 last:border-b-0">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-foreground">{item.categoryName}</span>

@@ -31,10 +31,10 @@ export default function OverviewCards() {
     );
   }
 
-  const totalBalance = balance?.balance || 0;
-  const income = monthly?.income || 0;
-  const expenses = monthly?.expenses || 0;
-  const savings = monthly?.savings || 0;
+  const totalBalance = (balance as any)?.balance || 0;
+  const income = (monthly as any)?.income || 0;
+  const expenses = (monthly as any)?.expenses || 0;
+  const savings = (monthly as any)?.savings || 0;
   const savingsRate = income > 0 ? (savings / income) * 100 : 0;
 
   const cards = [
