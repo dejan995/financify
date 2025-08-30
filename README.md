@@ -57,18 +57,35 @@ A comprehensive personal finance management application built with modern full-s
    npm install
    ```
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+3. **Choose your deployment method:**
 
-4. **Start the development server**
+   **Option A: Environment Variables (Recommended)**
    ```bash
+   # Set up environment variables
+   cp .env.example .env
+   # Edit .env with your database credentials
+   
+   # Start the development server
    npm run dev
    ```
 
-5. **Open your browser**
+   **Option B: Configuration Script**
+   ```bash
+   # Generate database config from environment variables
+   node scripts/setup-database-config.js
+   
+   # Start the development server
+   npm run dev
+   ```
+
+   **Option C: Web Interface Setup**
+   ```bash
+   # Start with default settings (SQLite)
+   npm run dev
+   # Complete setup through the web interface at http://localhost:5000
+   ```
+
+4. **Open your browser**
    Navigate to `http://localhost:5000`
 
 ### First-Time Setup
@@ -178,6 +195,7 @@ finance-tracker/
 │   └── nginx.conf            # Nginx configuration
 ├── scripts/                  # Utility scripts
 │   ├── deploy.sh             # Deployment automation
+│   ├── setup-database-config.js    # Database config generator
 │   └── healthcheck.js        # Container health checks
 ├── database-setup/           # Database initialization
 │   └── supabase-setup.sql    # Supabase schema setup
@@ -186,7 +204,7 @@ finance-tracker/
 │   ├── database.md           # Database setup guide
 │   ├── docker-README.md      # Docker deployment guide
 │   └── CONTRIBUTING.md       # Contribution guidelines
-├── data/                     # Local data directory
+├── data/                     # Local data directory (gitignored)
 ├── .env.example              # Environment template
 ├── .dockerignore             # Docker ignore patterns
 ├── package.json              # Node.js dependencies
@@ -210,24 +228,114 @@ finance-tracker/
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | Conditional | - |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key | Conditional | - |
 
-### Database Configuration
+### Database Configuration Methods
 
-#### Supabase (Recommended for Cloud)
+The application supports three configuration approaches with automatic prioritization:
+
+1. **Environment Variables** (Highest Priority)
+2. **Generated Configuration Files** (Medium Priority)  
+3. **Web Interface Setup** (Fallback)
+
+#### Method 1: Environment Variables (Recommended)
+
+**Supabase (Recommended for Cloud)**
 ```env
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
 ```
 
-#### PostgreSQL
+**PostgreSQL**
 ```env
 DATABASE_URL=postgresql://username:password@host:5432/database_name
 ```
 
-#### SQLite (Development)
+**SQLite (Development)**
 ```env
 # SQLite is used by default in development
 # No configuration required
+```
+
+#### Method 2: Configuration Script
+
+Generate `database-configs.json` from environment variables:
+
+```bash
+# With environment variables set
+SUPABASE_URL=your-url SUPABASE_ANON_KEY=your-key SUPABASE_SERVICE_KEY=your-service-key \
+node scripts/setup-database-config.js
+
+# Creates database-configs.json automatically
+# Application will detect and use the generated configuration
+```
+
+#### Method 3: Web Interface
+
+If no environment variables or configuration files exist:
+- Start the application: `npm run dev`
+- Navigate to `http://localhost:5000`
+- Complete the initialization wizard
+- Configuration is saved to `data/initialization.json` (gitignored)
+
+## 🚀 Deployment Options
+
+### Method 1: Environment Variables (Recommended)
+
+Both Docker and standalone deployments now support environment variables for seamless configuration:
+
+#### Standalone Deployment with Environment Variables
+```bash
+# 1. Set up environment variables
+cp .env.example .env
+
+# 2. Configure your database in .env:
+# For Supabase:
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-role-key
+
+# For PostgreSQL:
+DATABASE_URL=postgresql://username:password@host:5432/database_name
+
+# 3. Start the application
+npm run dev
+```
+
+#### Docker Deployment with Environment Variables
+```bash
+# 1. Use the deployment script (automatically uses environment variables)
+scripts/deploy.sh dev    # Development mode
+scripts/deploy.sh prod   # Production mode
+
+# 2. Or manually with Docker Compose
+cp .env.example .env
+# Edit .env with your credentials
+docker compose -f deployment/docker-compose.yml up -d
+```
+
+### Method 2: Configuration Script
+
+Generate database configuration programmatically from environment variables:
+
+```bash
+# Generate config from environment variables
+SUPABASE_URL=your-url SUPABASE_ANON_KEY=your-key node scripts/setup-database-config.js
+
+# Or create empty config for manual setup
+node scripts/setup-database-config.js
+
+# Then start the application
+npm run dev
+```
+
+### Method 3: Web Interface Setup
+
+Start with default settings and configure through the browser:
+
+```bash
+# Start with SQLite (no configuration needed)
+npm run dev
+# Complete setup at http://localhost:5000
 ```
 
 ## 🐳 Docker Deployment
@@ -259,24 +367,20 @@ scripts/deploy.sh stop
 scripts/deploy.sh help
 ```
 
-### First-Time Deployment
+### Docker Environment Configuration
 
-1. **Run the deployment script**
-   ```bash
-   scripts/deploy.sh dev
-   ```
+1. **The deployment script automatically:**
+   - Checks for Docker and Docker Compose installation
+   - Creates `.env` file from `.env.example` template
+   - Uses environment variables for database configuration
+   - Starts all required services with proper networking
 
-2. **The script will automatically:**
-   - Check for Docker and Docker Compose installation
-   - Create `.env` file from `.env.example` template
-   - Generate a secure session secret
-   - Prompt you to configure database settings
-   - Start all required services
-
-3. **Configure your database** in the created `.env` file:
+2. **Configure your database** in the `.env` file:
    - For Supabase: Add `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
    - For PostgreSQL: Add `DATABASE_URL`
    - Or use the included PostgreSQL container (no configuration needed)
+
+3. **No hardcoded configuration needed** - Everything works via environment variables
 
 ### Docker Services
 
@@ -499,6 +603,13 @@ npm run db:migrate
 - **Simplified database testing** in initialization wizard for improved stability
 - **Fixed all LSP diagnostics** - codebase now has zero TypeScript errors
 - **Maintained core functionality** while removing problematic migration features
+
+#### Environment Variable Integration
+- **Standalone Environment Variable Support**: Both Docker and standalone deployments now use environment variables for configuration
+- **Configuration Priority System**: Environment variables take precedence over JSON files for seamless Docker deployment
+- **Database Config Generator**: Created `setup-database-config.js` script to generate configurations from environment variables
+- **Improved .gitignore**: Added `data/initialization.json` to prevent committing runtime-generated files
+- **Unified Deployment**: Single deployment approach works for both Docker and standalone environments
 
 #### Docker Deployment Setup
 - **Created production-ready Dockerfile** with multi-stage builds for optimized image size
