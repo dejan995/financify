@@ -34,7 +34,7 @@ RUN adduser --system --uid 1001 nodejs
 # Copy the built application
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/client/dist ./client/dist
+COPY --from=builder /app/dist/public ./public
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/shared ./shared
 COPY --from=builder /app/scripts/healthcheck.js ./scripts/

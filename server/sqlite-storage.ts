@@ -641,17 +641,17 @@ export class SQLiteStorage implements IStorage {
   }
 
   async getActivityLogs(filters?: { userId?: number; action?: string; resource?: string; limit?: number }): Promise<ActivityLog[]> {
-    let query = this.db.select().from(schema.activityLog);
+    let query = this.db.select().from(schema.activityLogs);
 
     if (filters?.userId) {
-      query = query.where(eq(schema.activityLog.userId, filters.userId));
+      query = query.where(eq(schema.activityLogs.userId, filters.userId));
     }
 
     if (filters?.action) {
-      query = query.where(eq(schema.activityLog.action, filters.action));
+      query = query.where(eq(schema.activityLogs.action, filters.action));
     }
 
-    query = query.orderBy(desc(schema.activityLog.createdAt));
+    query = query.orderBy(desc(schema.activityLogs.createdAt));
 
     if (filters?.limit) {
       query = query.limit(filters.limit);
@@ -668,16 +668,16 @@ export class SQLiteStorage implements IStorage {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
     
-    const result = await this.db.delete(schema.activityLog)
-      .where(lte(schema.activityLog.createdAt, cutoffDate.toISOString()));
+    const result = await this.db.delete(schema.activityLogs)
+      .where(lte(schema.activityLogs.createdAt, cutoffDate.toISOString()));
     
     return result.changes;
   }
 
   async getRecentActivity(userId: number, limit: number = 10): Promise<ActivityLog[]> {
-    return await this.db.select().from(schema.activityLog)
-      .where(eq(schema.activityLog.userId, userId))
-      .orderBy(desc(schema.activityLog.createdAt))
+    return await this.db.select().from(schema.activityLogs)
+      .where(eq(schema.activityLogs.userId, userId))
+      .orderBy(desc(schema.activityLogs.createdAt))
       .limit(limit);
   }
 
