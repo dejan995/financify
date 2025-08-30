@@ -153,6 +153,7 @@ Changelog:
 - August 11, 2025. Enhanced admin interface database status detection to properly show "Supabase" instead of "In Memory" when using Supabase storage
 - August 11, 2025. Implemented automatic Supabase table creation for all required database tables (accounts, categories, transactions, budgets, goals, bills, products) to prevent "relation does not exist" errors
 - August 11, 2025. Fixed session deserialization errors by adding proper error handling and storage availability checks in authentication system
+- January 2025. Fixed navigation sidebar visibility - sidebar now only appears for authenticated users, login page displays without navigation for better user experience
 ```
 
 ## User Preferences

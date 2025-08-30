@@ -88,7 +88,7 @@ function AppContent() {
     );
   }
 
-  if (!initStatus || !initStatus.isInitialized) {
+  if (!initStatus || !(initStatus as any)?.isInitialized) {
     return (
       <InitializationWizard
         onComplete={() => {
