@@ -234,16 +234,49 @@ DATABASE_URL=postgresql://username:password@host:5432/database_name
 
 ### Quick Start with Docker
 
+The deployment script handles all Docker operations automatically:
+
 ```bash
-# Development mode
-./deploy.sh dev
+# Development mode with hot reload
+scripts/deploy.sh dev
 
-# Production mode
-./deploy.sh prod
+# Production mode with optimizations
+scripts/deploy.sh prod
 
-# Custom deployment
-docker-compose up -d
+# Start application (default mode)
+scripts/deploy.sh start
+
+# View application status
+scripts/deploy.sh status
+
+# View logs
+scripts/deploy.sh logs
+
+# Stop application
+scripts/deploy.sh stop
+
+# Get help and see all commands
+scripts/deploy.sh help
 ```
+
+### First-Time Deployment
+
+1. **Run the deployment script**
+   ```bash
+   scripts/deploy.sh dev
+   ```
+
+2. **The script will automatically:**
+   - Check for Docker and Docker Compose installation
+   - Create `.env` file from `.env.example` template
+   - Generate a secure session secret
+   - Prompt you to configure database settings
+   - Start all required services
+
+3. **Configure your database** in the created `.env` file:
+   - For Supabase: Add `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
+   - For PostgreSQL: Add `DATABASE_URL`
+   - Or use the included PostgreSQL container (no configuration needed)
 
 ### Docker Services
 
@@ -254,26 +287,43 @@ docker-compose up -d
 
 ### Production Deployment
 
-1. **Configure environment**
+1. **Use the deployment script (Recommended)**
    ```bash
-   cp .env.example .env.production
-   # Edit with production values
+   scripts/deploy.sh prod
    ```
 
-2. **Deploy with Docker Compose**
+2. **Manual Docker Compose deployment**
    ```bash
-   docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.production up -d
+   # Configure environment
+   cp .env.example .env
+   # Edit .env with production values
+   
+   # Deploy with production configuration
+   docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.prod.yml up -d
    ```
 
-3. **Set up SSL certificates**
+3. **SSL Configuration (for production)**
    ```bash
-   # Place SSL certificates in ./ssl/
-   # Update nginx.conf with your domain
+   # Place SSL certificates in deployment/ssl/
+   # Update deployment/nginx.conf with your domain
    ```
 
-4. **Configure domain and DNS**
+4. **Domain and DNS Setup**
    - Point your domain to the server
    - Update nginx configuration with your domain name
+
+### Backup and Maintenance
+
+```bash
+# Create backup of data and database
+scripts/deploy.sh backup
+
+# Update application with latest code
+scripts/deploy.sh update
+
+# Clean up all containers and volumes (⚠️ DATA LOSS)
+scripts/deploy.sh cleanup
+```
 
 ## 📊 API Documentation
 
