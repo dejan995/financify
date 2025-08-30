@@ -170,13 +170,22 @@ finance-tracker/
 │   ├── database-config.ts    # Database configuration types
 │   ├── initialization-config.ts    # Initialization types
 │   └── schema.ts             # Database schema and types
-├── docker/                   # Docker configuration
+├── deployment/               # Docker deployment configuration
 │   ├── Dockerfile            # Production container
 │   ├── docker-compose.yml    # Development orchestration
 │   ├── docker-compose.prod.yml     # Production orchestration
 │   ├── docker-compose.override.yml # Development overrides
-│   ├── nginx.conf            # Nginx configuration
-│   └── deploy.sh             # Deployment automation
+│   └── nginx.conf            # Nginx configuration
+├── scripts/                  # Utility scripts
+│   ├── deploy.sh             # Deployment automation
+│   └── healthcheck.js        # Container health checks
+├── database-setup/           # Database initialization
+│   └── supabase-setup.sql    # Supabase schema setup
+├── docs/                     # Project documentation
+│   ├── api.md                # API documentation
+│   ├── database.md           # Database setup guide
+│   ├── docker-README.md      # Docker deployment guide
+│   └── CONTRIBUTING.md       # Contribution guidelines
 ├── data/                     # Local data directory
 ├── .env.example              # Environment template
 ├── .dockerignore             # Docker ignore patterns

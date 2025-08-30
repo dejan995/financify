@@ -93,20 +93,20 @@ deploy_application() {
     
     if [ "$mode" = "development" ]; then
         print_status "Starting in development mode with hot reload..."
-        docker-compose -f docker-compose.yml -f docker-compose.override.yml up --build -d
+        docker-compose -f deployment/docker-compose.yml -f deployment/docker-compose.override.yml up --build -d
     elif [ "$mode" = "production" ]; then
         print_status "Starting in production mode..."
-        docker-compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+        docker-compose -f deployment/docker-compose.yml -f deployment/docker-compose.prod.yml up --build -d
     else
         print_status "Starting in default mode..."
-        docker-compose up --build -d
+        docker-compose -f deployment/docker-compose.yml up --build -d
     fi
 }
 
 # Show application status
 show_status() {
     print_header "Application Status"
-    docker-compose ps
+    docker-compose -f deployment/docker-compose.yml ps
     
     print_status ""
     print_status "Application URLs:"
@@ -116,10 +116,10 @@ show_status() {
     
     print_status ""
     print_status "Useful commands:"
-    print_status "  - View logs: docker-compose logs -f finance-app"
-    print_status "  - Stop services: docker-compose down"
-    print_status "  - Restart: docker-compose restart finance-app"
-    print_status "  - View all logs: docker-compose logs"
+    print_status "  - View logs: docker-compose -f deployment/docker-compose.yml logs -f finance-app"
+    print_status "  - Stop services: docker-compose -f deployment/docker-compose.yml down"
+    print_status "  - Restart: docker-compose -f deployment/docker-compose.yml restart finance-app"
+    print_status "  - View all logs: docker-compose -f deployment/docker-compose.yml logs"
 }
 
 # Backup function
@@ -130,9 +130,9 @@ backup_data() {
     mkdir -p "$backup_dir"
     
     # Backup PostgreSQL if running
-    if docker-compose ps postgres | grep -q "Up"; then
+    if docker-compose -f deployment/docker-compose.yml ps postgres | grep -q "Up"; then
         print_status "Backing up PostgreSQL database..."
-        docker-compose exec -T postgres pg_dump -U finance_user finance_db > "$backup_dir/database.sql"
+        docker-compose -f deployment/docker-compose.yml exec -T postgres pg_dump -U finance_user finance_db > "$backup_dir/database.sql"
     fi
     
     # Backup application data
@@ -151,7 +151,7 @@ cleanup() {
     echo
     
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker-compose down -v --remove-orphans
+        docker-compose -f deployment/docker-compose.yml down -v --remove-orphans
         docker system prune -f
         print_status "Cleanup completed"
     else
@@ -167,9 +167,9 @@ update_application() {
     git pull origin main 2>/dev/null || print_warning "Git pull failed or not a git repository"
     
     print_status "Rebuilding and restarting containers..."
-    docker-compose down
-    docker-compose build --no-cache
-    docker-compose up -d
+    docker-compose -f deployment/docker-compose.yml down
+    docker-compose -f deployment/docker-compose.yml build --no-cache
+    docker-compose -f deployment/docker-compose.yml up -d
     
     print_status "Update completed"
 }
@@ -197,15 +197,15 @@ main() {
             show_status
             ;;
         "stop"|"down")
-            docker-compose down
+            docker-compose -f deployment/docker-compose.yml down
             print_status "Application stopped"
             ;;
         "restart")
-            docker-compose restart
+            docker-compose -f deployment/docker-compose.yml restart
             show_status
             ;;
         "logs")
-            docker-compose logs -f finance-app
+            docker-compose -f deployment/docker-compose.yml logs -f finance-app
             ;;
         "status")
             show_status

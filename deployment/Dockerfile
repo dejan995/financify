@@ -37,8 +37,8 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/client/dist ./client/dist
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/shared ./shared
-COPY --from=builder /app/healthcheck.js ./
-COPY --from=builder /app/supabase-setup.sql ./
+COPY --from=builder /app/scripts/healthcheck.js ./scripts/
+COPY --from=builder /app/database-setup/supabase-setup.sql ./database-setup/
 
 # Create data directory for SQLite and other data files
 RUN mkdir -p ./data && chown -R nodejs:nodejs ./data
@@ -54,7 +54,7 @@ ENV PORT=5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node healthcheck.js
+    CMD node scripts/healthcheck.js
 
 # Start the application
 CMD ["npm", "start"]

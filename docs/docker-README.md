@@ -20,10 +20,10 @@ The application is fully containerized with support for:
 - **CPU**: 2 cores recommended
 
 ### Required Files
-- `Dockerfile` - Application container definition
-- `docker-compose.yml` - Development orchestration
-- `docker-compose.prod.yml` - Production overrides
-- `nginx.conf` - Reverse proxy configuration
+- `deployment/Dockerfile` - Application container definition
+- `deployment/docker-compose.yml` - Development orchestration
+- `deployment/docker-compose.prod.yml` - Production overrides
+- `deployment/nginx.conf` - Reverse proxy configuration
 - `.env` - Environment configuration
 
 ## Quick Start
@@ -35,10 +35,10 @@ git clone <repository-url>
 cd finance-tracker
 
 # Start development environment
-./deploy.sh dev
+./scripts/deploy.sh dev
 
 # Or manually with docker-compose
-docker-compose up -d
+docker-compose -f deployment/docker-compose.yml up -d
 ```
 
 ### Production Deployment
@@ -48,10 +48,10 @@ cp .env.example .env.production
 # Edit .env.production with your values
 
 # Deploy production stack
-./deploy.sh prod
+./scripts/deploy.sh prod
 
 # Or manually with production compose
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f deployment/docker-compose.yml -f deployment/docker-compose.prod.yml up -d
 ```
 
 ## Container Architecture
@@ -81,7 +81,9 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```yaml
 services:
   finance-app:
-    build: .
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
     ports:
       - "5000:5000"
     environment:
