@@ -4,8 +4,8 @@ services:
   # Main application
   finance-app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: deployment/Dockerfile
     ports:
       - "5000:5000"
     environment:
@@ -35,7 +35,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # Initialize database with schema if needed
-      - ./supabase-setup.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ../database-setup/supabase-setup.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     ports:
       - "5432:5432"
     restart: unless-stopped

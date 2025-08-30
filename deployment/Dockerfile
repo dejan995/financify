@@ -8,17 +8,17 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY ../package*.json ./
 RUN npm ci --only=production
 
 # Build the application
 FROM base AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY ../package*.json ./
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY .. .
 
 # Build the application
 RUN npm run build

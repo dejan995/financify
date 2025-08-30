@@ -7,11 +7,12 @@ version: '3.8'
 services:
   finance-app:
     build:
-      context: .
+      context: ..
+      dockerfile: deployment/Dockerfile
       target: runner
     volumes:
       # Mount source code for development (hot reload)
-      - .:/app
+      - ..:/app
       - /app/node_modules
     environment:
       - NODE_ENV=development

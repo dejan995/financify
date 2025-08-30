@@ -5,6 +5,9 @@
 
 set -e
 
+# Change to project root directory (one level up from scripts)
+cd "$(dirname "$0")/.."
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -59,6 +62,13 @@ check_prerequisites() {
         exit 1
     fi
     
+    # Set docker compose command based on what's available
+    if command_exists docker-compose; then
+        DOCKER_COMPOSE="docker-compose"
+    else
+        DOCKER_COMPOSE="docker compose"
+    fi
+    
     print_status "Docker and Docker Compose are installed"
 }
 
@@ -93,20 +103,20 @@ deploy_application() {
     
     if [ "$mode" = "development" ]; then
         print_status "Starting in development mode with hot reload..."
-        docker-compose -f deployment/docker-compose.yml -f deployment/docker-compose.override.yml up --build -d
+        $DOCKER_COMPOSE -f deployment/docker-compose.yml -f deployment/docker-compose.override.yml up --build -d
     elif [ "$mode" = "production" ]; then
         print_status "Starting in production mode..."
-        docker-compose -f deployment/docker-compose.yml -f deployment/docker-compose.prod.yml up --build -d
+        $DOCKER_COMPOSE -f deployment/docker-compose.yml -f deployment/docker-compose.prod.yml up --build -d
     else
         print_status "Starting in default mode..."
-        docker-compose -f deployment/docker-compose.yml up --build -d
+        $DOCKER_COMPOSE -f deployment/docker-compose.yml up --build -d
     fi
 }
 
 # Show application status
 show_status() {
     print_header "Application Status"
-    docker-compose -f deployment/docker-compose.yml ps
+    $DOCKER_COMPOSE -f deployment/docker-compose.yml ps
     
     print_status ""
     print_status "Application URLs:"
@@ -116,10 +126,10 @@ show_status() {
     
     print_status ""
     print_status "Useful commands:"
-    print_status "  - View logs: docker-compose -f deployment/docker-compose.yml logs -f finance-app"
-    print_status "  - Stop services: docker-compose -f deployment/docker-compose.yml down"
-    print_status "  - Restart: docker-compose -f deployment/docker-compose.yml restart finance-app"
-    print_status "  - View all logs: docker-compose -f deployment/docker-compose.yml logs"
+    print_status "  - View logs: $DOCKER_COMPOSE -f deployment/docker-compose.yml logs -f finance-app"
+    print_status "  - Stop services: $DOCKER_COMPOSE -f deployment/docker-compose.yml down"
+    print_status "  - Restart: $DOCKER_COMPOSE -f deployment/docker-compose.yml restart finance-app"
+    print_status "  - View all logs: $DOCKER_COMPOSE -f deployment/docker-compose.yml logs"
 }
 
 # Backup function
@@ -130,9 +140,9 @@ backup_data() {
     mkdir -p "$backup_dir"
     
     # Backup PostgreSQL if running
-    if docker-compose -f deployment/docker-compose.yml ps postgres | grep -q "Up"; then
+    if $DOCKER_COMPOSE -f deployment/docker-compose.yml ps postgres | grep -q "Up"; then
         print_status "Backing up PostgreSQL database..."
-        docker-compose -f deployment/docker-compose.yml exec -T postgres pg_dump -U finance_user finance_db > "$backup_dir/database.sql"
+        $DOCKER_COMPOSE -f deployment/docker-compose.yml exec -T postgres pg_dump -U finance_user finance_db > "$backup_dir/database.sql"
     fi
     
     # Backup application data
@@ -151,7 +161,7 @@ cleanup() {
     echo
     
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker-compose -f deployment/docker-compose.yml down -v --remove-orphans
+        $DOCKER_COMPOSE -f deployment/docker-compose.yml down -v --remove-orphans
         docker system prune -f
         print_status "Cleanup completed"
     else
@@ -167,9 +177,9 @@ update_application() {
     git pull origin main 2>/dev/null || print_warning "Git pull failed or not a git repository"
     
     print_status "Rebuilding and restarting containers..."
-    docker-compose -f deployment/docker-compose.yml down
-    docker-compose -f deployment/docker-compose.yml build --no-cache
-    docker-compose -f deployment/docker-compose.yml up -d
+    $DOCKER_COMPOSE -f deployment/docker-compose.yml down
+    $DOCKER_COMPOSE -f deployment/docker-compose.yml build --no-cache
+    $DOCKER_COMPOSE -f deployment/docker-compose.yml up -d
     
     print_status "Update completed"
 }
@@ -197,15 +207,18 @@ main() {
             show_status
             ;;
         "stop"|"down")
-            docker-compose -f deployment/docker-compose.yml down
+            check_prerequisites
+            $DOCKER_COMPOSE -f deployment/docker-compose.yml down
             print_status "Application stopped"
             ;;
         "restart")
-            docker-compose -f deployment/docker-compose.yml restart
+            check_prerequisites
+            $DOCKER_COMPOSE -f deployment/docker-compose.yml restart
             show_status
             ;;
         "logs")
-            docker-compose -f deployment/docker-compose.yml logs -f finance-app
+            check_prerequisites
+            $DOCKER_COMPOSE -f deployment/docker-compose.yml logs -f finance-app
             ;;
         "status")
             show_status
