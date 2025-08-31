@@ -39,8 +39,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: UpsertUser): Promise<User> {
+    // Create a clean user object excluding null timestamp fields
+    const { lastLoginAt, passwordResetExpires, ...cleanUser } = user;
+    
     const result = await this.db.insert(schema.users).values({
-      ...user,
+      ...cleanUser,
+      // Only include timestamp fields if they have actual values
+      ...(lastLoginAt && { lastLoginAt }),
+      ...(passwordResetExpires && { passwordResetExpires }),
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
@@ -48,8 +54,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, updates: Partial<UpsertUser>): Promise<User | undefined> {
+    // Handle timestamp fields properly for updates as well
+    const { lastLoginAt, passwordResetExpires, ...cleanUpdates } = updates;
+    
     const result = await this.db.update(schema.users)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ 
+        ...cleanUpdates,
+        ...(lastLoginAt !== undefined && { lastLoginAt }),
+        ...(passwordResetExpires !== undefined && { passwordResetExpires }),
+        updatedAt: new Date() 
+      })
       .where(eq(schema.users.id, id))
       .returning();
     return result[0];
@@ -300,9 +314,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Analytics
-  async getAccountBalance(userId: number): Promise<number> {
+  async getAccountBalance(userId: number): Promise<{ balance: number }> {
     const accounts = await this.getAccounts(userId);
-    return accounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
+    const balance = accounts.reduce((sum, account) => sum + parseFloat(account.balance), 0);
+    return { balance };
   }
 
   async getMonthlyIncome(userId: number, month: string): Promise<number> {
@@ -352,7 +367,7 @@ export class DatabaseStorage implements IStorage {
       )
       .groupBy(schema.transactions.categoryId, schema.categories.name);
 
-    return result.map(row => ({
+    return result.map((row: any) => ({
       categoryId: row.categoryId,
       amount: row.amount,
       categoryName: row.categoryName || 'Unknown',
