@@ -1,14 +1,31 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage, setStorageFromWizard } from "./storage";
-import { setupAuth, requireAuth, requireAdmin, AuthService } from "./customAuth";
-import { 
-  insertAccountSchema, insertCategorySchema, insertTransactionSchema,
-  insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
-  insertUserSchema, updateUserSchema, insertSystemConfigSchema, insertActivityLogSchema
+import {
+  setupAuth,
+  requireAuth,
+  requireAdmin,
+  AuthService,
+} from "./customAuth";
+import {
+  insertAccountSchema,
+  insertCategorySchema,
+  insertTransactionSchema,
+  insertBudgetSchema,
+  insertGoalSchema,
+  insertBillSchema,
+  insertProductSchema,
+  insertUserSchema,
+  updateUserSchema,
+  insertSystemConfigSchema,
+  insertActivityLogSchema,
 } from "@shared/schema";
 import { insertDatabaseConfigSchema } from "@shared/database-config";
-import { initializationSchema, AdminSetupData, DatabaseSetupData } from "@shared/initialization-config";
+import {
+  initializationSchema,
+  AdminSetupData,
+  DatabaseSetupData,
+} from "@shared/initialization-config";
 import { initializationManager } from "./initialization-manager";
 import { environmentManager } from "./environment-manager";
 import { connectionTester } from "./database-connection-tester";
@@ -29,10 +46,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const context = environmentManager.getDeploymentContext();
       const recommendations = initializationManager.getSetupRecommendations();
-      
+
       res.json({
         ...context,
-        recommendations
+        recommendations,
       });
     } catch (error) {
       console.error("Error getting deployment context:", error);
@@ -43,56 +60,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/initialization/test-database", async (req, res) => {
     try {
       const databaseConfig = req.body as DatabaseSetupData;
-      
+
       console.log(`Testing ${databaseConfig.provider} connection...`);
-      
-      const result = await initializationManager.testDatabaseConnection(databaseConfig);
-      
+
+      const result =
+        await initializationManager.testDatabaseConnection(databaseConfig);
+
       console.log(`Connection test result:`, {
         success: result.success,
         latency: result.latency,
-        error: result.error
+        error: result.error,
       });
 
       res.json(result);
     } catch (error) {
       console.error("Connection test error:", error);
-      res.json({ 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Connection test failed' 
+      res.json({
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Connection test failed",
       });
     }
   });
-
   // Validate database configuration
   app.post("/api/initialization/validate-config", async (req, res) => {
     try {
       const config = req.body as DatabaseSetupData;
-      
+
       // Test connection
       const connectionResult = await connectionTester.testConnection(config);
-      
+
       // Validate schema if connection successful
       let schemaResult = null;
       if (connectionResult.success) {
         schemaResult = await connectionTester.validateSchema(config);
       }
-      
+
       // Get recommendations
       const recommendations = connectionTester.getConnectionRecommendations(
         environmentManager.isRunningInDocker(),
-        config.provider
+        config.provider,
       );
-      
+
       res.json({
         connection: connectionResult,
         schema: schemaResult,
-        recommendations
+        recommendations,
       });
     } catch (error) {
       console.error("Configuration validation error:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : 'Validation failed' 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Validation failed",
       });
     }
   });
@@ -103,29 +121,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if already initialized
       if (initializationManager.isInitialized()) {
-        return res.status(400).json({ message: "Application is already initialized" });
+        return res
+          .status(400)
+          .json({ message: "Application is already initialized" });
       }
 
-      console.log(`Starting initialization: admin=${admin.username}, database=${database.provider}`);
+      console.log(
+        `Starting initialization: admin=${admin.username}, database=${database.provider}`,
+      );
       // Initialize the application
-      const result = await initializationManager.initializeApplication(admin, database);
+      const result = await initializationManager.initializeApplication(
+        admin,
+        database,
+      );
 
       if (result.success) {
         // Set storage from the completed initialization
         await setStorageFromWizard(database.provider, database);
-        
+
         res.json({
           message: "Application initialized successfully",
           admin: result.adminUser,
           database: result.database,
           envGenerated: result.envGenerated,
           deploymentInstructions: result.deploymentInstructions,
-          isInitialized: true
+          isInitialized: true,
         });
       } else {
         res.status(400).json({
           message: "Initialization failed",
-          error: result.error
+          error: result.error,
         });
       }
     } catch (error) {
@@ -140,16 +165,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reset initialization (development only)
   app.post("/api/initialization/reset", async (req, res) => {
     try {
-      if (process.env.NODE_ENV === 'production') {
-        return res.status(403).json({ message: "Reset not allowed in production" });
+      if (process.env.NODE_ENV === "production") {
+        return res
+          .status(403)
+          .json({ message: "Reset not allowed in production" });
       }
-      
+
       initializationManager.resetInitialization();
       res.json({ message: "Initialization reset successfully" });
     } catch (error) {
       console.error("Reset error:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "Reset failed" 
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Reset failed",
       });
     }
   });
@@ -179,11 +206,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const result = insertAccountSchema.safeParse({
         ...req.body,
-        userId
+        userId,
       });
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const account = await storage.createAccount(result.data);
@@ -198,11 +227,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const account = await storage.getAccount(id);
-      
+
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
       }
-      
+
       res.json(account);
     } catch (error) {
       console.error("Error fetching account:", error);
@@ -216,7 +245,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = insertAccountSchema.partial().safeParse(req.body);
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const account = await storage.updateAccount(id, result.data);
@@ -235,11 +266,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteAccount(id);
-      
+
       if (!success) {
         return res.status(404).json({ message: "Account not found" });
       }
-      
+
       res.json({ message: "Account deleted successfully" });
     } catch (error) {
       console.error("Error deleting account:", error);
@@ -247,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Categories API  
+  // Categories API
   app.get("/api/categories", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -264,11 +295,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const result = insertCategorySchema.safeParse({
         ...req.body,
-        userId
+        userId,
       });
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const category = await storage.createCategory(result.data);
@@ -284,13 +317,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const { accountId, categoryId, startDate, endDate, type } = req.query;
-      
+
       const filters = {
         accountId: accountId ? parseInt(accountId as string) : undefined,
         categoryId: categoryId ? parseInt(categoryId as string) : undefined,
         startDate: startDate as string,
         endDate: endDate as string,
-        type: type as string
+        type: type as string,
       };
 
       const transactions = await storage.getTransactions(userId, filters);
@@ -306,11 +339,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const result = insertTransactionSchema.safeParse({
         ...req.body,
-        userId
+        userId,
       });
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const transaction = await storage.createTransaction(result.data);
@@ -338,11 +373,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const result = insertBudgetSchema.safeParse({
         ...req.body,
-        userId
+        userId,
       });
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const budget = await storage.createBudget(result.data);
@@ -370,11 +407,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const result = insertGoalSchema.safeParse({
         ...req.body,
-        userId
+        userId,
       });
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const goal = await storage.createGoal(result.data);
@@ -402,11 +441,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const result = insertBillSchema.safeParse({
         ...req.body,
-        userId
+        userId,
       });
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const bill = await storage.createBill(result.data);
@@ -432,9 +473,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { q } = req.query;
       if (!q) {
-        return res.status(400).json({ message: "Query parameter 'q' is required" });
+        return res
+          .status(400)
+          .json({ message: "Query parameter 'q' is required" });
       }
-      
+
       const products = await storage.searchProducts(q as string);
       res.json(products);
     } catch (error) {
@@ -447,11 +490,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { barcode } = req.params;
       const product = await storage.getProductByBarcode(barcode);
-      
+
       if (!product) {
         return res.status(404).json({ message: "Product not found" });
       }
-      
+
       res.json(product);
     } catch (error) {
       console.error("Error fetching product by barcode:", error);
@@ -464,7 +507,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = insertProductSchema.safeParse(req.body);
 
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid data", errors: result.error.errors });
+        return res
+          .status(400)
+          .json({ message: "Invalid data", errors: result.error.errors });
       }
 
       const product = await storage.createProduct(result.data);
@@ -487,46 +532,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/income/:month", requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { month } = req.params;
-      const income = await storage.getMonthlyIncome(userId, month);
-      res.json({ income });
-    } catch (error) {
-      console.error("Error fetching income:", error);
-      res.status(500).json({ message: "Failed to fetch income" });
-    }
-  });
-
-  app.get("/api/analytics/expenses/:month", requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { month } = req.params;
-      const expenses = await storage.getMonthlyExpenses(userId, month);
-      res.json({ expenses });
-    } catch (error) {
-      console.error("Error fetching expenses:", error);
-      res.status(500).json({ message: "Failed to fetch expenses" });
-    }
-  });
-
-  app.get("/api/analytics/category-spending", requireAuth, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const { startDate, endDate } = req.query;
-      
-      if (!startDate || !endDate) {
-        return res.status(400).json({ message: "startDate and endDate are required" });
+  app.get(
+    "/api/analytics/income/:month",
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { month } = req.params;
+        const income = await storage.getMonthlyIncome(userId, month);
+        res.json({ income });
+      } catch (error) {
+        console.error("Error fetching income:", error);
+        res.status(500).json({ message: "Failed to fetch income" });
       }
-      
-      const spending = await storage.getCategorySpending(userId, startDate as string, endDate as string);
-      res.json(spending);
-    } catch (error) {
-      console.error("Error fetching category spending:", error);
-      res.status(500).json({ message: "Failed to fetch category spending" });
-    }
-  });
+    },
+  );
+
+  app.get(
+    "/api/analytics/expenses/:month",
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { month } = req.params;
+        const expenses = await storage.getMonthlyExpenses(userId, month);
+        res.json({ expenses });
+      } catch (error) {
+        console.error("Error fetching expenses:", error);
+        res.status(500).json({ message: "Failed to fetch expenses" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/analytics/category-spending",
+    requireAuth,
+    async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const { startDate, endDate } = req.query;
+
+        if (!startDate || !endDate) {
+          return res
+            .status(400)
+            .json({ message: "startDate and endDate are required" });
+        }
+
+        const spending = await storage.getCategorySpending(
+          userId,
+          startDate as string,
+          endDate as string,
+        );
+        res.json(spending);
+      } catch (error) {
+        console.error("Error fetching category spending:", error);
+        res.status(500).json({ message: "Failed to fetch category spending" });
+      }
+    },
+  );
 
   // Initialize admin user in Supabase (temporary endpoint for setup)
   app.post("/api/admin/create-from-initialization", async (req: any, res) => {
@@ -534,13 +597,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get initialization config
       const config = initializationManager.getInitializationStatus();
       if (!config.isInitialized || !config.adminUser) {
-        return res.status(400).json({ message: "No initialization data found" });
+        return res
+          .status(400)
+          .json({ message: "No initialization data found" });
       }
 
       // Check if admin user already exists
-      const existingUser = await storage.getUserByUsername(config.adminUser.username);
+      const existingUser = await storage.getUserByUsername(
+        config.adminUser.username,
+      );
       if (existingUser) {
-        return res.json({ message: "Admin user already exists", user: existingUser });
+        return res.json({
+          message: "Admin user already exists",
+          user: existingUser,
+        });
       }
 
       // Create the admin user in Supabase with the same credentials as initialization
@@ -575,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const users = await storage.getAllUsers();
       // Remove password hashes from response
-      const safeUsers = users.map(user => {
+      const safeUsers = users.map((user) => {
         const { passwordHash, ...safeUser } = user;
         return safeUser;
       });
@@ -589,10 +659,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/admin/users", requireAdmin, async (req: any, res) => {
     try {
       const { password, ...userData } = req.body;
-      
+
       // Hash the password using the same method as registration
-      const hashedPassword = await AuthService.hashPassword(password || "defaultpassword123");
-      
+      const hashedPassword = await AuthService.hashPassword(
+        password || "defaultpassword123",
+      );
+
       // Create a UpsertUser object with all required fields
       const userToCreate: any = {
         username: userData.username,
@@ -607,9 +679,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailVerificationToken: null,
         passwordResetToken: null,
         passwordResetExpires: null,
-        lastLoginAt: null
+        lastLoginAt: null,
       };
-      
+
       const user = await storage.createUser(userToCreate);
       // Remove password hash from response
       const { passwordHash, ...safeUser } = user;
@@ -624,14 +696,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const updates = updateUserSchema.parse(req.body);
-      
+
       // If password is provided, hash it
       if (updates.password) {
         const { password, ...otherUpdates } = updates;
         const hashedPassword = await AuthService.hashPassword(password);
         const finalUpdates = {
           ...otherUpdates,
-          passwordHash: hashedPassword
+          passwordHash: hashedPassword,
         };
         const user = await storage.updateUser(id, finalUpdates);
         if (!user) {
@@ -693,75 +765,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/databases", requireAdmin, async (req: any, res) => {
     try {
       const configs = [];
-      
+
       // Check if we have an active Supabase configuration from initialization
       try {
-        const { databaseConfigManager } = await import('./database-config-manager');
+        const { databaseConfigManager } = await import(
+          "./database-config-manager"
+        );
         const supabaseConfigs = await databaseConfigManager.getAllConfigs();
-        const activeSupabaseConfig = supabaseConfigs.find((cfg: any) => cfg.provider === 'supabase' && cfg.isActive);
-        
+        const activeSupabaseConfig = supabaseConfigs.find(
+          (cfg: any) => cfg.provider === "supabase" && cfg.isActive,
+        );
+
         // If we have an active Supabase config, show it as the primary database
         if (activeSupabaseConfig) {
           const supabaseDbConfig = {
             id: activeSupabaseConfig.id,
-            name: activeSupabaseConfig.name || 'Supabase Database',
-            provider: 'supabase',
+            name: activeSupabaseConfig.name || "Supabase Database",
+            provider: "supabase",
             isActive: true,
             isConnected: true,
             connectionString: `supabase://${activeSupabaseConfig.supabaseUrl}`,
             host: new URL(activeSupabaseConfig.supabaseUrl).hostname,
-            database: 'postgres',
+            database: "postgres",
             lastConnectionTest: new Date(),
             createdAt: activeSupabaseConfig.createdAt,
             updatedAt: activeSupabaseConfig.updatedAt,
           };
-          
+
           // Return Supabase config plus any other configs
           res.json([supabaseDbConfig, ...configs]);
           return;
         }
       } catch (error) {
-        console.error('Error checking Supabase config:', error);
+        console.error("Error checking Supabase config:", error);
       }
-      
+
       res.json(configs);
     } catch (error) {
       console.error("Error fetching database configs:", error);
-      res.status(500).json({ message: "Failed to fetch database configurations" });
+      res
+        .status(500)
+        .json({ message: "Failed to fetch database configurations" });
     }
   });
 
   app.post("/api/admin/databases", requireAdmin, async (req: any, res) => {
-    res.status(501).json({ message: "Database management has been disabled for system stability" });
+    res
+      .status(501)
+      .json({
+        message: "Database management has been disabled for system stability",
+      });
   });
 
   app.put("/api/admin/databases/:id", requireAdmin, async (req: any, res) => {
-    res.status(501).json({ message: "Database management has been disabled for system stability" });
+    res
+      .status(501)
+      .json({
+        message: "Database management has been disabled for system stability",
+      });
   });
 
-  app.delete("/api/admin/databases/:id", requireAdmin, async (req: any, res) => {
-    res.status(501).json({ message: "Database management has been disabled for system stability" });
-  });
+  app.delete(
+    "/api/admin/databases/:id",
+    requireAdmin,
+    async (req: any, res) => {
+      res
+        .status(501)
+        .json({
+          message: "Database management has been disabled for system stability",
+        });
+    },
+  );
 
-  app.post("/api/admin/databases/:id/test", requireAdmin, async (req: any, res) => {
-    res.status(501).json({ message: "Database management has been disabled for system stability" });
-  });
+  app.post(
+    "/api/admin/databases/:id/test",
+    requireAdmin,
+    async (req: any, res) => {
+      res
+        .status(501)
+        .json({
+          message: "Database management has been disabled for system stability",
+        });
+    },
+  );
 
-  app.post("/api/admin/databases/:id/activate", requireAdmin, async (req: any, res) => {
-    res.status(501).json({ message: "Database management has been disabled for system stability" });
-  });
+  app.post(
+    "/api/admin/databases/:id/activate",
+    requireAdmin,
+    async (req: any, res) => {
+      res
+        .status(501)
+        .json({
+          message: "Database management has been disabled for system stability",
+        });
+    },
+  );
 
-  app.post("/api/admin/databases/migrate", requireAdmin, async (req: any, res) => {
-    res.status(501).json({ message: "Migration functionality has been disabled for system stability" });
-  });
+  app.post(
+    "/api/admin/databases/migrate",
+    requireAdmin,
+    async (req: any, res) => {
+      res
+        .status(501)
+        .json({
+          message:
+            "Migration functionality has been disabled for system stability",
+        });
+    },
+  );
 
-  app.get("/api/admin/databases/migrations", requireAdmin, async (req: any, res) => {
-    res.json([]);
-  });
+  app.get(
+    "/api/admin/databases/migrations",
+    requireAdmin,
+    async (req: any, res) => {
+      res.json([]);
+    },
+  );
 
-  app.get("/api/admin/databases/migrations/:id", requireAdmin, async (req: any, res) => {
-    res.status(404).json({ message: "Migration log not found" });
-  });
+  app.get(
+    "/api/admin/databases/migrations/:id",
+    requireAdmin,
+    async (req: any, res) => {
+      res.status(404).json({ message: "Migration log not found" });
+    },
+  );
 
   const httpServer = createServer(app);
   return httpServer;

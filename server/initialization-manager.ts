@@ -456,6 +456,30 @@ export class InitializationManager {
 
     console.log("✓ Initialization reset complete");
   }
+
+  // Force reset by creating a reset flag - this allows resetting even with environment variables
+  public forceReset(): void {
+    try {
+      writeFileSync("./data/force-reset.flag", "reset");
+      this.resetInitialization();
+      console.log(
+        "Force reset initiated - initialization wizard will be shown",
+      );
+    } catch (error) {
+      console.error("Failed to create force reset flag:", error);
+    }
+  }
+
+  // Clear the force reset flag (called after successful initialization)
+  public clearForceReset(): void {
+    try {
+      if (existsSync("./data/force-reset.flag")) {
+        require("fs").unlinkSync("./data/force-reset.flag");
+      }
+    } catch (error) {
+      console.error("Failed to clear force reset flag:", error);
+    }
+  }
 }
 
 export const initializationManager = new InitializationManager();
