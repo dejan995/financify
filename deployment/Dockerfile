@@ -7,9 +7,9 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
+# Copy package files and install production dependencies + vite
 COPY ../package*.json ./
-RUN npm ci --only=production
+RUN npm ci --only=production && npm install vite
 
 # Build the application
 FROM base AS builder
