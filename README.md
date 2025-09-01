@@ -61,9 +61,9 @@ A comprehensive personal finance management application built with modern full-s
 
    **Option A: Environment Variables (Recommended)**
    ```bash
-   # Set up environment variables
-   cp .env.example .env
-   # Edit .env with your database credentials
+   # Generate configuration for your database provider
+   node scripts/setup-database-config.js template supabase
+   # Edit .env with your actual credentials
    
    # Start the development server
    npm run dev
@@ -71,8 +71,13 @@ A comprehensive personal finance management application built with modern full-s
 
    **Option B: Configuration Script**
    ```bash
-   # Generate database config from environment variables
-   node scripts/setup-database-config.js
+   # Set environment variables first, then generate config
+   export SUPABASE_URL="https://your-project.supabase.co"
+   export SUPABASE_ANON_KEY="your-anon-key"
+   export SUPABASE_SERVICE_KEY="your-service-key"
+   
+   # Generate configuration
+   node scripts/setup-database-config.js generate supabase
    
    # Start the development server
    npm run dev
@@ -80,9 +85,9 @@ A comprehensive personal finance management application built with modern full-s
 
    **Option C: Web Interface Setup**
    ```bash
-   # Start with default settings (SQLite)
+   # Start with SQLite (no configuration needed)
    npm run dev
-   # Complete setup through the web interface at http://localhost:5000
+   # Complete setup through the initialization wizard
    ```
 
 4. **Open your browser**
@@ -218,25 +223,40 @@ finance-tracker/
 
 ### Environment Variables
 
+Enhanced environment variable support with automatic generation and validation:
+
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
 | `NODE_ENV` | Environment mode | No | `development` |
 | `PORT` | Server port | No | `5000` |
 | `SESSION_SECRET` | Session encryption key | Yes | - |
-| `DATABASE_URL` | PostgreSQL connection string | Conditional | - |
+| `DATABASE_URL` | Database connection string | Conditional | - |
 | `SUPABASE_URL` | Supabase project URL | Conditional | - |
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | Conditional | - |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key | Conditional | - |
+| `POSTGRES_HOST` | PostgreSQL host | Conditional | `localhost` |
+| `POSTGRES_PORT` | PostgreSQL port | Conditional | `5432` |
+| `POSTGRES_DB` | PostgreSQL database | Conditional | - |
+| `POSTGRES_USER` | PostgreSQL username | Conditional | - |
+| `POSTGRES_PASSWORD` | PostgreSQL password | Conditional | - |
+| `MYSQL_HOST` | MySQL host | Conditional | `localhost` |
+| `MYSQL_PORT` | MySQL port | Conditional | `3306` |
+| `MYSQL_DATABASE` | MySQL database | Conditional | - |
+| `MYSQL_USER` | MySQL username | Conditional | - |
+| `MYSQL_PASSWORD` | MySQL password | Conditional | - |
+| `SQLITE_DATABASE_PATH` | SQLite file path | Conditional | `./data/finance.db` |
 
 ### Database Configuration Methods
 
-The application supports three configuration approaches with automatic prioritization:
+The application supports multiple configuration approaches with automatic prioritization:
 
-1. **Environment Variables** (Highest Priority)
-2. **Generated Configuration Files** (Medium Priority)  
-3. **Web Interface Setup** (Fallback)
+1. **Environment Variables** (Highest Priority) - Perfect for Docker and production
+2. **Initialization Wizard** (Medium Priority) - User-friendly web interface
+3. **Configuration Scripts** (Developer-friendly) - Command-line tools
 
 #### Method 1: Environment Variables (Recommended)
+
+The most robust method, especially for Docker deployments:
 
 **Supabase (Recommended for Cloud)**
 ```env
@@ -245,162 +265,233 @@ SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_KEY=your-service-role-key
 ```
 
+**Neon Database (Serverless PostgreSQL)**
+```env
+DATABASE_URL=postgresql://username:password@ep-xxx-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require
+```
+
+**PlanetScale (Serverless MySQL)**
+```env
+DATABASE_URL=mysql://username:password@aws.connect.psdb.cloud/database?ssl={"rejectUnauthorized":true}
+```
+
 **PostgreSQL**
 ```env
 DATABASE_URL=postgresql://username:password@host:5432/database_name
+# Optional: Individual parameters for Docker Compose
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=finance_db
+POSTGRES_USER=finance_user
+POSTGRES_PASSWORD=finance_password
+```
+
+**MySQL**
+```env
+DATABASE_URL=mysql://username:password@host:3306/database_name
+# Optional: Individual parameters for Docker Compose
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=finance_db
+MYSQL_USER=finance_user
+MYSQL_PASSWORD=finance_password
 ```
 
 **SQLite (Development)**
 ```env
-# SQLite is used by default in development
-# No configuration required
+SQLITE_DATABASE_PATH=./data/finance.db
 ```
 
-#### Method 2: Configuration Script
+#### Method 2: Initialization Wizard (Recommended for First-Time Users)
 
-Generate `database-configs.json` from environment variables:
+The enhanced initialization wizard now supports:
+- **All Database Providers**: Supabase, Neon, PlanetScale, PostgreSQL, MySQL, SQLite
+- **Automatic Environment Generation**: Creates .env files automatically
+- **Connection Testing**: Validates credentials before proceeding
+- **Docker Detection**: Automatically configures for Docker deployments
+- **Schema Validation**: Checks for required database tables
+- **Deployment Instructions**: Provides next steps after setup
 
 ```bash
-# With environment variables set
-SUPABASE_URL=your-url SUPABASE_ANON_KEY=your-key SUPABASE_SERVICE_KEY=your-service-key \
-node scripts/setup-database-config.js
+# Start the application
+npm run dev
 
-# Creates database-configs.json automatically
-# Application will detect and use the generated configuration
+# Navigate to http://localhost:5000
+# Follow the initialization wizard
 ```
 
-#### Method 3: Web Interface
+#### Method 3: Configuration Scripts
 
-If no environment variables or configuration files exist:
-- Start the application: `npm run dev`
-- Navigate to `http://localhost:5000`
-- Complete the initialization wizard
-- Configuration is saved to `data/initialization.json` (gitignored)
+Enhanced command-line tools for developers:
+
+```bash
+# Detect current configuration
+node scripts/setup-database-config.js detect
+
+# Generate configuration for specific provider
+node scripts/setup-database-config.js generate supabase
+
+# Create template for manual editing
+node scripts/setup-database-config.js template postgresql
+
+# Validate current configuration
+node scripts/setup-database-config.js validate
+
+# Reset all configuration
+node scripts/setup-database-config.js reset
+```
+
+### Supported Database Providers
+
+| Provider | Type | Best For | Auto-Setup | Connection Method |
+|----------|------|----------|------------|-------------------|
+| **Supabase** | Cloud PostgreSQL | Production | ✅ Full | URL + API Keys |
+| **Neon** | Serverless PostgreSQL | Production | ✅ Full | Connection String |
+| **PlanetScale** | Serverless MySQL | Production | ✅ Full | Connection String |
+| **PostgreSQL** | Traditional SQL | Self-hosted | ✅ Full | URL or Individual Fields |
+| **MySQL** | Traditional SQL | Self-hosted | ✅ Full | URL or Individual Fields |
+| **SQLite** | File-based | Development | ✅ Full | File Path |
 
 ## 🚀 Deployment Options
 
 ### Method 1: Environment Variables (Recommended)
 
-Both Docker and standalone deployments now support environment variables for seamless configuration:
+Enhanced environment variable support with automatic detection and validation:
 
 #### Standalone Deployment with Environment Variables
 ```bash
-# 1. Set up environment variables
-cp .env.example .env
+# 1. Generate configuration for your provider
+node scripts/setup-database-config.js template supabase
 
-# 2. Configure your database in .env:
-# For Supabase:
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-role-key
+# 2. Edit .env with your actual credentials
+# For Supabase: Add your project URL and API keys
+# For others: Add connection strings or individual parameters
 
-# For PostgreSQL:
-DATABASE_URL=postgresql://username:password@host:5432/database_name
+# 3. Validate configuration
+node scripts/setup-database-config.js validate
 
-# 3. Start the application
+# 4. Start the application
 npm run dev
 ```
 
 #### Docker Deployment with Environment Variables
 ```bash
-# 1. Use the deployment script (automatically uses environment variables)
+# 1. Generate Docker-optimized configuration
+node scripts/setup-database-config.js generate supabase
+
+# 2. Use the deployment script
 scripts/deploy.sh dev    # Development mode
 scripts/deploy.sh prod   # Production mode
 
-# 2. Or manually with Docker Compose
-cp .env.example .env
-# Edit .env with your credentials
+# 3. Or manually with Docker Compose
 docker compose -f deployment/docker-compose.yml up -d
 ```
 
 ### Method 2: Configuration Script
 
-Generate database configuration programmatically from environment variables:
+Enhanced configuration scripts with multi-provider support:
 
 ```bash
-# Generate config from environment variables
-SUPABASE_URL=your-url SUPABASE_ANON_KEY=your-key node scripts/setup-database-config.js
+# Detect current configuration
+node scripts/setup-database-config.js detect
 
-# Or create empty config for manual setup
-node scripts/setup-database-config.js
+# Generate configuration with environment variables
+SUPABASE_URL=your-url SUPABASE_ANON_KEY=your-key SUPABASE_SERVICE_KEY=your-service-key \
+node scripts/setup-database-config.js generate supabase
 
-# Then start the application
+# Create template for manual editing
+node scripts/setup-database-config.js template postgresql
+
+# Validate configuration
+node scripts/setup-database-config.js validate
+
+# Start the application
 npm run dev
 ```
 
 ### Method 3: Web Interface Setup
 
-Start with default settings and configure through the browser:
+Enhanced initialization wizard with comprehensive provider support:
 
 ```bash
-# Start with SQLite (no configuration needed)
+# Start the application (uses SQLite by default)
 npm run dev
-# Complete setup at http://localhost:5000
+
+# Navigate to http://localhost:5000
+# Follow the enhanced initialization wizard:
+# 1. Create admin account
+# 2. Choose database provider (Supabase, Neon, PostgreSQL, MySQL, SQLite)
+# 3. Configure connection parameters
+# 4. Test database connection
+# 5. Generate .env file automatically
+# 6. Complete setup with deployment instructions
 ```
 
 ## 🐳 Docker Deployment
 
 ### Quick Start with Docker
 
-The deployment script handles all Docker operations automatically:
+Enhanced Docker support with automatic database configuration:
 
 ```bash
+# Generate Docker-optimized configuration
+node scripts/setup-database-config.js generate supabase
+
 # Development mode with hot reload
 scripts/deploy.sh dev
 
 # Production mode with optimizations
 scripts/deploy.sh prod
 
-# Start application (default mode)
-scripts/deploy.sh start
-
-# View application status
-scripts/deploy.sh status
-
-# View logs
-scripts/deploy.sh logs
-
-# Stop application
-scripts/deploy.sh stop
-
-# Get help and see all commands
-scripts/deploy.sh help
+# Or use docker-compose directly
+docker-compose -f deployment/docker-compose.yml up -d
 ```
 
 ### Docker Environment Configuration
 
-1. **The deployment script automatically:**
-   - Checks for Docker and Docker Compose installation
-   - Creates `.env` file from `.env.example` template
-   - Uses environment variables for database configuration
-   - Starts all required services with proper networking
+1. **Enhanced Docker support:**
+   - Automatic environment variable detection
+   - Support for all database providers
+   - Automatic Docker Compose override generation
+   - Built-in database services for PostgreSQL and MySQL
+   - Persistent volume management
 
-2. **Configure your database** in the `.env` file:
-   - For Supabase: Add `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-   - For PostgreSQL: Add `DATABASE_URL`
-   - Or use the included PostgreSQL container (no configuration needed)
+2. **Database options in Docker:**
+   - **Cloud databases** (Supabase, Neon, PlanetScale): Use external services
+   - **Included PostgreSQL**: Automatic container with persistent storage
+   - **Included MySQL**: Alternative to PostgreSQL with persistent storage
+   - **SQLite**: File-based storage with volume mounting
 
-3. **No hardcoded configuration needed** - Everything works via environment variables
+3. **Automatic configuration:**
+   - Environment variables take precedence
+   - Docker Compose overrides generated automatically
+   - Service dependencies managed automatically
+   - Health checks and monitoring included
 
 ### Docker Services
 
-- **finance-app**: Main application server
-- **postgres**: PostgreSQL database (optional)
-- **redis**: Session storage and caching (optional)
-- **nginx**: Reverse proxy and SSL termination (production)
+- **finance-app**: Main application server with multi-database support
+- **postgres**: PostgreSQL database service (optional, for local development)
+- **mysql**: MySQL database service (optional, alternative to PostgreSQL)
+- **redis**: Session storage and caching (optional, for production)
+- **nginx**: Reverse proxy and SSL termination (production only)
 
 ### Production Deployment
 
-1. **Use the deployment script (Recommended)**
+1. **Environment-based deployment (Recommended)**
    ```bash
+   # Generate production configuration
+   node scripts/setup-database-config.js generate supabase
+   
+   # Deploy with production settings
    scripts/deploy.sh prod
    ```
 
 2. **Manual Docker Compose deployment**
    ```bash
-   # Configure environment
-   cp .env.example .env
-   # Edit .env with production values
+   # Generate and configure environment
+   node scripts/setup-database-config.js template supabase
+   # Edit .env with your production credentials
    
    # Deploy with production configuration
    docker compose -f deployment/docker-compose.yml -f deployment/docker-compose.prod.yml up -d
