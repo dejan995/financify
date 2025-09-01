@@ -193,7 +193,7 @@ Environment Variables:
     DATABASE_URL=mysql://user:pass@host:port/db
 `);
 }
-Usage: node scripts/setup-database-config.js [command] [options]
+// Usage: node scripts/setup-database-config.js [command] [options]
 function detectConfiguration() {
   console.log('🔍 Detecting database configuration...\n');
   
