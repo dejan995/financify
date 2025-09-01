@@ -1,8 +1,10 @@
 import { existsSync, writeFileSync, readFileSync } from 'fs';
 import { mkdir } from 'fs/promises';
 import { join } from 'path';
-import { DatabaseConfig, DatabaseProvider } from '@shared/database-config';
-// Database manager removed for system stability
+import { DatabaseProvider } from '@shared/database-config';
+import { DatabaseSetupData, AdminSetupData, validateDatabaseConfig, buildConnectionString } from '@shared/initialization-config';
+import { environmentManager } from './environment-manager';
+import { connectionTester, ConnectionTestResult } from './database-connection-tester';
 import { AuthService } from './customAuth';
 import { SQLiteStorage } from './sqlite-storage';
 import { UpsertUser } from '@shared/schema';
@@ -17,7 +19,13 @@ interface InitializationConfig {
   database?: {
     provider: DatabaseProvider;
     name: string;
-    configId?: string;
+    connectionString?: string;
+    envGenerated?: boolean;
+  };
+  deploymentContext?: {
+    isDocker: boolean;
+    hasEnvFile: boolean;
+    detectedProvider: string | null;
   };
   createdAt?: Date;
 }
@@ -38,11 +46,14 @@ export class InitializationManager {
 
   // Check if application has been initialized
   public isInitialized(): boolean {
-    // If environment variables are present, consider the app initialized
-    if (this.hasEnvironmentConfig()) {
+    // Priority 1: Check environment variables (for Docker/production deployments)
+    const envContext = environmentManager.getDeploymentContext();
+    if (envContext.detectedProvider && envContext.envValidation?.isValid) {
+      console.log(`App initialized via environment variables (${envContext.detectedProvider})`);
       return true;
     }
 
+    // Priority 2: Check initialization file
     if (!existsSync(this.configPath)) {
       return false;
     }
@@ -51,149 +62,132 @@ export class InitializationManager {
       const config: InitializationConfig = JSON.parse(readFileSync(this.configPath, 'utf8'));
       return config.isInitialized === true;
     } catch (error) {
+      console.error('Error reading initialization config:', error);
       return false;
     }
   }
 
-  // Check if environment variables provide a complete configuration
-  private hasEnvironmentConfig(): boolean {
-    // Check for Supabase environment variables
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_SERVICE_KEY) {
-      return true;
-    }
-    
-    // Check for PostgreSQL environment variable
-    if (process.env.DATABASE_URL) {
-      return true;
-    }
-    
-    return false;
-  }
 
   // Get current initialization status
   public getInitializationStatus(): InitializationConfig {
-    // If environment variables are present, return environment-based config
-    if (this.hasEnvironmentConfig()) {
-      const envConfig: InitializationConfig = {
+    const envContext = environmentManager.getDeploymentContext();
+    
+    // Priority 1: Environment variables (Docker/production)
+    if (envContext.detectedProvider && envContext.envValidation?.isValid) {
+      return {
         isInitialized: true,
         database: {
-          provider: process.env.SUPABASE_URL ? 'supabase' : 'postgresql',
+          provider: envContext.detectedProvider as DatabaseProvider,
           name: 'Environment Database',
-          configId: process.env.SUPABASE_URL ? 'env-supabase' : 'env-postgres',
+          connectionString: this.getConnectionStringFromEnv(envContext.detectedProvider),
+          envGenerated: true,
         },
+        deploymentContext: envContext,
         createdAt: new Date(),
       };
-      
-      // Include admin user info if available from saved config
-      if (existsSync(this.configPath)) {
-        try {
-          const savedConfig: InitializationConfig = JSON.parse(readFileSync(this.configPath, 'utf8'));
-          if (savedConfig.adminUser) {
-            envConfig.adminUser = savedConfig.adminUser;
-          }
-        } catch (error) {
-          // Ignore errors reading saved config when using environment variables
-        }
-      }
-      
-      return envConfig;
     }
 
+    // Priority 2: Saved configuration file
     if (!existsSync(this.configPath)) {
-      return { isInitialized: false };
+      return { 
+        isInitialized: false,
+        deploymentContext: envContext
+      };
     }
 
     try {
-      return JSON.parse(readFileSync(this.configPath, 'utf8'));
+      const config = JSON.parse(readFileSync(this.configPath, 'utf8'));
+      return {
+        ...config,
+        deploymentContext: envContext
+      };
     } catch (error) {
-      return { isInitialized: false };
+      console.error('Error reading initialization config:', error);
+      return { 
+        isInitialized: false,
+        deploymentContext: envContext
+      };
     }
   }
 
+  private getConnectionStringFromEnv(provider: string): string {
+    switch (provider) {
+      case 'supabase':
+        return `supabase://${process.env.SUPABASE_URL}`;
+      case 'neon':
+      case 'planetscale':
+      case 'postgresql':
+      case 'mysql':
+        return process.env.DATABASE_URL || '';
+      case 'sqlite':
+        return process.env.SQLITE_DATABASE_PATH || './data/finance.db';
+      default:
+        return '';
+    }
+  }
   // Test database connection without saving configuration
-  public async testDatabaseConnection(config: {
-    provider: DatabaseProvider;
-    host?: string;
-    port?: string;
-    database?: string;
-    username?: string;
-    password?: string;
-    connectionString?: string;
-    supabaseUrl?: string;
-    supabaseAnonKey?: string;
-    supabaseServiceKey?: string;
-  }): Promise<{ success: boolean; error?: string }> {
-    try {
-      if (config.provider === 'sqlite') {
-        // SQLite is always available locally
-        return { success: true };
-      }
-
-      // Handle Supabase differently
-      if (config.provider === 'supabase') {
-        console.log('Server received Supabase config:', {
-          supabaseUrl: config.supabaseUrl,
-          supabaseAnonKey: config.supabaseAnonKey ? 'PROVIDED' : 'MISSING',
-          supabaseServiceKey: config.supabaseServiceKey ? 'PROVIDED' : 'MISSING',
-          supabaseServiceKeyLength: config.supabaseServiceKey?.length || 0,
-          supabaseServiceKeyValue: config.supabaseServiceKey || 'undefined/empty'
-        });
-        
-        if (!config.supabaseUrl || !config.supabaseAnonKey || !config.supabaseServiceKey || 
-            config.supabaseUrl.trim() === '' || config.supabaseAnonKey.trim() === '' || config.supabaseServiceKey.trim() === '') {
-          return { success: false, error: 'Supabase URL, Anonymous Key, and Service Role Key are all required' };
-        }
-        
-        // Supabase connection testing has been simplified for system stability
-        return { success: true };
-      }
-
-      // For other providers, test the connection
-      const testConfig: Omit<DatabaseConfig, 'id' | 'createdAt' | 'updatedAt' | 'isConnected' | 'lastConnectionTest'> = {
-        name: 'Test Connection',
-        provider: config.provider,
-        connectionString: config.connectionString || '',
-        host: config.host,
-        port: config.port,
-        database: config.database,
-        username: config.username,
-        password: config.password,
-        ssl: true,
-        isActive: false,
-        maxConnections: 10,
+  public async testDatabaseConnection(config: DatabaseSetupData): Promise<ConnectionTestResult> {
+    console.log(`Testing ${config.provider} database connection...`);
+    
+    // Validate configuration first
+    const validation = validateDatabaseConfig(config);
+    if (!validation.isValid) {
+      return {
+        success: false,
+        error: `Configuration validation failed: ${validation.errors.join(', ')}`
       };
+    }
 
-      // Database testing has been simplified for system stability
-      return { success: true };
+    try {
+      // Use the robust connection tester
+      const result = await connectionTester.testConnectionWithRetry(config, 3);
+      
+      if (result.success) {
+        console.log(`✓ ${config.provider} connection successful (${result.latency}ms)`);
+        
+        // Also validate schema if connection is successful
+        const schemaValidation = await connectionTester.validateSchema(config);
+        if (!schemaValidation.hasSchema && schemaValidation.missingTables.length > 0) {
+          console.log(`⚠ Schema validation: ${schemaValidation.missingTables.length} tables missing`);
+          result.details = {
+            ...result.details,
+            schemaStatus: 'missing_tables',
+            missingTables: schemaValidation.missingTables
+          };
+        }
+      } else {
+        console.log(`✗ ${config.provider} connection failed: ${result.error}`);
+      }
+      
+      return result;
     } catch (error) {
       return { 
         success: false, 
-        error: error instanceof Error ? error.message : 'Unknown connection error' 
+        error: error instanceof Error ? error.message : 'Unknown connection error',
+        latency: 0
       };
     }
   }
 
   // Initialize the application with admin user and database
-  public async initializeApplication(adminData: {
-    username: string;
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-  }, databaseConfig: {
-    provider: DatabaseProvider;
-    name: string;
-    host?: string;
-    port?: string;
-    database?: string;
-    username?: string;
-    password?: string;
-    connectionString?: string;
-    supabaseUrl?: string;
-    supabaseAnonKey?: string;
-    supabaseServiceKey?: string;
-  }): Promise<{ success: boolean; adminUser?: any; database?: any; error?: string }> {
+  public async initializeApplication(
+    adminData: AdminSetupData, 
+    databaseConfig: DatabaseSetupData
+  ): Promise<{ 
+    success: boolean; 
+    adminUser?: any; 
+    database?: any; 
+    envGenerated?: boolean;
+    deploymentInstructions?: string;
+    error?: string 
+  }> {
     try {
+      console.log(`Starting initialization with ${databaseConfig.provider} provider...`);
+      
+      // Get deployment context
+      const deploymentContext = environmentManager.getDeploymentContext();
+      console.log('Deployment context:', deploymentContext);
+      
       // First, test the database connection
       const connectionTest = await this.testDatabaseConnection(databaseConfig);
       if (!connectionTest.success) {
@@ -202,21 +196,32 @@ export class InitializationManager {
           error: `Database connection failed: ${connectionTest.error}`
         };
       }
+      
+      console.log(`✓ Database connection test passed (${connectionTest.latency}ms)`);
 
       // Initialize storage based on provider
       let storage: any;
-      let dbConfigResult: DatabaseConfig | null = null;
+      let envGenerated = false;
 
+      // Generate environment file if requested
+      if (databaseConfig.generateEnvFile && !databaseConfig.useExistingEnv) {
+        console.log('Generating .env file...');
+        environmentManager.backupExistingEnv();
+        environmentManager.generateEnvFile(databaseConfig, deploymentContext.isDocker);
+        
+        if (deploymentContext.hasDockerCompose) {
+          environmentManager.generateDockerComposeOverride(databaseConfig);
+        }
+        
+        envGenerated = true;
+        console.log('✓ Environment configuration generated');
+      }
       if (databaseConfig.provider === 'sqlite') {
-        // Initialize SQLite storage
+        console.log('Initializing SQLite storage...');
         storage = new SQLiteStorage('./data/finance.db');
       } else if (databaseConfig.provider === 'supabase') {
-        // Initialize new Supabase storage implementation
+        console.log('Initializing Supabase storage...');
         const { SupabaseStorageNew } = await import('./supabase-storage-new');
-        console.log('Initializing new Supabase storage with credentials:');
-        console.log('- URL:', databaseConfig.supabaseUrl);
-        console.log('- Anon Key provided:', databaseConfig.supabaseAnonKey ? 'Yes' : 'No');
-        console.log('- Service Key provided:', databaseConfig.supabaseServiceKey ? 'Yes' : 'No');
         
         if (!databaseConfig.supabaseServiceKey) {
           throw new Error('Supabase Service Role Key is required for automatic setup');
@@ -224,54 +229,42 @@ export class InitializationManager {
         
         storage = new SupabaseStorageNew(databaseConfig.supabaseUrl!, databaseConfig.supabaseAnonKey!, databaseConfig.supabaseServiceKey!);
         
-        // Save Supabase credentials to database config manager for restoration
-        const { databaseConfigManager } = await import('./database-config-manager');
-        const supabaseConfigId = `supabase-${Date.now()}`;
-        await databaseConfigManager.saveConfig({
-          id: supabaseConfigId,
-          name: databaseConfig.name || 'Supabase Database',
-          provider: 'supabase',
-          supabaseUrl: databaseConfig.supabaseUrl!,
-          supabaseAnonKey: databaseConfig.supabaseAnonKey!,
-          supabaseServiceKey: databaseConfig.supabaseServiceKey!,
-          isActive: true,
-          isConnected: true,
-          ssl: true,
-          maxConnections: 10,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        
-        dbConfigResult = { id: supabaseConfigId } as DatabaseConfig;
-        console.log('Supabase configuration saved to database config manager');
-        
-        // Initialize Supabase schema - new implementation checks table existence
+        // Initialize Supabase schema
         try {
           await storage.initializeSchema();
-          console.log('Supabase schema check completed - tables verified');
+          console.log('✓ Supabase schema initialized');
         } catch (error) {
           console.error('Supabase schema check failed:', error);
-          // For new implementation, we fail fast if tables don't exist
           throw new Error(`Supabase setup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
+      } else if (databaseConfig.provider === 'neon') {
+        console.log('Initializing Neon database storage...');
+        const { DatabaseStorage } = await import('./database-storage');
+        storage = new DatabaseStorage(databaseConfig.connectionString!);
+      } else if (databaseConfig.provider === 'postgresql') {
+        console.log('Initializing PostgreSQL storage...');
+        const { DatabaseStorage } = await import('./database-storage');
+        const connectionString = buildConnectionString(databaseConfig);
+        storage = new DatabaseStorage(connectionString);
+      } else if (databaseConfig.provider === 'mysql') {
+        console.log('Initializing MySQL storage...');
+        // MySQL storage would need to be implemented
+        // For now, fall back to SQLite with a warning
+        console.warn('MySQL storage not yet implemented, falling back to SQLite');
+        storage = new SQLiteStorage('./data/finance.db');
+      } else if (databaseConfig.provider === 'planetscale') {
+        console.log('Initializing PlanetScale storage...');
+        // PlanetScale uses MySQL protocol
+        console.warn('PlanetScale storage not yet implemented, falling back to SQLite');
+        storage = new SQLiteStorage('./data/finance.db');
       } else {
-        // For external databases, add configuration and use it
-        // External database configuration has been simplified
-        dbConfigResult = { 
-          id: `config-${Date.now()}`,
-          name: databaseConfig.name || 'External Database',
-          provider: databaseConfig.provider
-        } as DatabaseConfig;
-
-        // For now, we'll use SQLite as primary storage and sync later
-        // This avoids WebSocket issues during initialization
+        console.warn(`Provider ${databaseConfig.provider} not fully implemented, using SQLite`);
         storage = new SQLiteStorage('./data/finance.db');
       }
 
       // Create admin user
       console.log('Creating admin user:', adminData.username);
       const hashedPassword = await AuthService.hashPassword(adminData.password);
-      console.log('Password hashed successfully');
       
       const userDataToCreate = {
         username: adminData.username,
@@ -289,10 +282,8 @@ export class InitializationManager {
         lastLoginAt: null,
       } as UpsertUser;
       
-      console.log('Admin user data prepared:', userDataToCreate);
       const adminUser = await storage.createUser(userDataToCreate);
-      
-      console.log('Admin user created successfully:', adminUser.id);
+      console.log(`✓ Admin user created: ${adminUser.username} (ID: ${adminUser.id})`);
 
       // Save initialization configuration
       const initConfig: InitializationConfig = {
@@ -305,17 +296,18 @@ export class InitializationManager {
         database: {
           provider: databaseConfig.provider,
           name: databaseConfig.name,
-          configId: dbConfigResult?.id,
+          connectionString: buildConnectionString(databaseConfig),
+          envGenerated,
         },
+        deploymentContext: deploymentContext,
         createdAt: new Date(),
       };
 
       writeFileSync(this.configPath, JSON.stringify(initConfig, null, 2));
+      console.log('✓ Initialization configuration saved');
 
-      console.log('Initialization successful:', {
-        adminUserId: adminUser.id,
-        provider: databaseConfig.provider
-      });
+      // Generate deployment instructions
+      const deploymentInstructions = environmentManager.generateDeploymentInstructions(databaseConfig);
 
       return {
         success: true,
@@ -327,38 +319,94 @@ export class InitializationManager {
         database: {
           provider: databaseConfig.provider,
           name: databaseConfig.name,
-          configId: dbConfigResult?.id,
-          // Include Supabase configuration for immediate storage switch
-          supabaseUrl: databaseConfig.supabaseUrl,
-          supabaseAnonKey: databaseConfig.supabaseAnonKey,
-          supabaseServiceKey: databaseConfig.supabaseServiceKey,
+          connectionString: buildConnectionString(databaseConfig),
         },
+        envGenerated,
+        deploymentInstructions,
       };
     } catch (error) {
       console.error('Full initialization error:', error);
-      console.error('Error type:', typeof error);
-      console.error('Error name:', (error as any)?.name);
-      console.error('Error message:', (error as any)?.message);
-      console.error('Error code:', (error as any)?.code);
-      console.error('Error details:', (error as any)?.details);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available');
       
       return {
         success: false,
-        error: error instanceof Error ? error.message : `Unknown initialization error: ${JSON.stringify(error)}`
+        error: error instanceof Error ? error.message : 'Unknown initialization error'
       };
     }
   }
 
+  // Get setup recommendations based on deployment context
+  public getSetupRecommendations(): {
+    recommendedProvider: string;
+    deploymentType: string;
+    recommendations: string[];
+    warnings?: string[];
+  } {
+    const context = environmentManager.getDeploymentContext();
+    
+    if (context.isDocker) {
+      return {
+        recommendedProvider: 'supabase',
+        deploymentType: 'Docker Container',
+        recommendations: [
+          'Supabase is recommended for Docker deployments',
+          'No additional containers needed',
+          'Automatic scaling and backups',
+          'Environment variables will be configured automatically'
+        ],
+        warnings: [
+          'Ensure container has internet access for cloud databases'
+        ]
+      };
+    }
+    
+    if (context.hasEnvFile && context.detectedProvider) {
+      return {
+        recommendedProvider: context.detectedProvider,
+        deploymentType: 'Standalone with Existing Configuration',
+        recommendations: [
+          `Detected ${context.detectedProvider} configuration in .env`,
+          'You can use existing configuration or reconfigure',
+          'Backup will be created before any changes'
+        ]
+      };
+    }
+    
+    return {
+      recommendedProvider: 'sqlite',
+      deploymentType: 'Standalone Development',
+      recommendations: [
+        'SQLite is perfect for development and testing',
+        'No external database server required',
+        'Easy to backup and migrate later',
+        'Can upgrade to cloud database anytime'
+      ]
+    };
+  }
   // Reset initialization (for development/testing)
   public resetInitialization(): void {
+    console.log('Resetting initialization...');
+    
+    // Remove initialization file
     if (existsSync(this.configPath)) {
       try {
         require('fs').unlinkSync(this.configPath);
+        console.log('✓ Removed initialization config');
       } catch (error) {
         console.error('Failed to reset initialization:', error);
       }
     }
+    
+    // Optionally backup and remove .env file
+    if (existsSync('./.env')) {
+      try {
+        environmentManager.backupExistingEnv();
+        console.log('✓ Backed up .env file');
+      } catch (error) {
+        console.error('Failed to backup .env file:', error);
+      }
+    }
+    
+    console.log('✓ Initialization reset complete');
   }
 }
 

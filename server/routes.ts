@@ -7,10 +7,11 @@ import {
   insertBudgetSchema, insertGoalSchema, insertBillSchema, insertProductSchema,
   insertUserSchema, updateUserSchema, insertSystemConfigSchema, insertActivityLogSchema
 } from "@shared/schema";
-// Database manager removed to improve system stability
 import { insertDatabaseConfigSchema } from "@shared/database-config";
-import { initializationSchema } from "@shared/initialization-config";
+import { initializationSchema, AdminSetupData, DatabaseSetupData } from "@shared/initialization-config";
 import { initializationManager } from "./initialization-manager";
+import { environmentManager } from "./environment-manager";
+import { connectionTester } from "./database-connection-tester";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Check if app is initialized (WordPress-style)
@@ -23,36 +24,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get deployment context and recommendations
+  app.get("/api/initialization/deployment-context", async (req, res) => {
+    try {
+      const context = environmentManager.getDeploymentContext();
+      const recommendations = initializationManager.getSetupRecommendations();
+      
+      res.json({
+        ...context,
+        recommendations
+      });
+    } catch (error) {
+      console.error("Error getting deployment context:", error);
+      res.status(500).json({ error: "Failed to get deployment context" });
+    }
+  });
   // Test database connection (before initialization)
   app.post("/api/initialization/test-database", async (req, res) => {
     try {
-      const { provider, host, port, database, username, password, connectionString, supabaseUrl, supabaseAnonKey, supabaseServiceKey } = req.body;
+      const databaseConfig = req.body as DatabaseSetupData;
       
-      // Validate Supabase fields if provider is supabase
-      if (provider === 'supabase') {
-        if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-          return res.json({ 
-            success: false, 
-            error: 'Supabase URL, Anonymous Key, and Service Role Key are required' 
-          });
-        }
-      }
+      console.log(`Testing ${databaseConfig.provider} connection...`);
       
-      const result = await initializationManager.testDatabaseConnection({
-        provider,
-        host,
-        port,
-        database,
-        username,
-        password,
-        connectionString,
-        supabaseUrl,
-        supabaseAnonKey,
-        supabaseServiceKey,
+      const result = await initializationManager.testDatabaseConnection(databaseConfig);
+      
+      console.log(`Connection test result:`, {
+        success: result.success,
+        latency: result.latency,
+        error: result.error
       });
 
       res.json(result);
     } catch (error) {
+      console.error("Connection test error:", error);
       res.json({ 
         success: false, 
         error: error instanceof Error ? error.message : 'Connection test failed' 
@@ -60,6 +64,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Validate database configuration
+  app.post("/api/initialization/validate-config", async (req, res) => {
+    try {
+      const config = req.body as DatabaseSetupData;
+      
+      // Test connection
+      const connectionResult = await connectionTester.testConnection(config);
+      
+      // Validate schema if connection successful
+      let schemaResult = null;
+      if (connectionResult.success) {
+        schemaResult = await connectionTester.validateSchema(config);
+      }
+      
+      // Get recommendations
+      const recommendations = connectionTester.getConnectionRecommendations(
+        environmentManager.isRunningInDocker(),
+        config.provider
+      );
+      
+      res.json({
+        connection: connectionResult,
+        schema: schemaResult,
+        recommendations
+      });
+    } catch (error) {
+      console.error("Configuration validation error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Validation failed' 
+      });
+    }
+  });
   // Initialize the application (WordPress-style)
   app.post("/api/initialization", async (req, res) => {
     try {
@@ -70,6 +106,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Application is already initialized" });
       }
 
+      console.log(`Starting initialization: admin=${admin.username}, database=${database.provider}`);
       // Initialize the application
       const result = await initializationManager.initializeApplication(admin, database);
 
@@ -81,6 +118,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Application initialized successfully",
           admin: result.adminUser,
           database: result.database,
+          envGenerated: result.envGenerated,
+          deploymentInstructions: result.deploymentInstructions,
           isInitialized: true
         });
       } else {
@@ -91,15 +130,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Initialization error:", error);
-      console.error("Error details:", JSON.stringify(error, null, 2));
       res.status(500).json({
         message: "Initialization failed",
         error: error instanceof Error ? error.message : "Unknown error",
-        details: error
       });
     }
   });
 
+  // Reset initialization (development only)
+  app.post("/api/initialization/reset", async (req, res) => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: "Reset not allowed in production" });
+      }
+      
+      initializationManager.resetInitialization();
+      res.json({ message: "Initialization reset successfully" });
+    } catch (error) {
+      console.error("Reset error:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Reset failed" 
+      });
+    }
+  });
   // Auth middleware
   setupAuth(app);
 

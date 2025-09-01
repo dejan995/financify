@@ -2,57 +2,30 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { User, Database, Shield, CheckCircle, ArrowRight, ArrowLeft, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { 
+  User, Database, Shield, CheckCircle, ArrowRight, ArrowLeft, Loader2, 
+  AlertTriangle, CheckCircle2, Settings, Cloud, HardDrive, Zap, 
+  Globe, Server, FileText, Copy, ExternalLink, Info
+} from "lucide-react";
 import { supportedDatabaseProviders, databaseProviderInfo } from "@shared/database-config";
-
-const adminSetupSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  confirmPassword: z.string(),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-
-const databaseSetupSchema = z.object({
-  provider: z.enum(supportedDatabaseProviders),
-  name: z.string().min(1, "Database name is required"),
-  host: z.string().optional(),
-  port: z.string().optional(),
-  database: z.string().optional(),
-  username: z.string().optional(),
-  password: z.string().optional(),
-  connectionString: z.string().optional(),
-  // Supabase-specific fields
-  supabaseUrl: z.string().optional(),
-  supabaseAnonKey: z.string().optional(),
-  supabaseServiceKey: z.string().optional(),
-}).refine((data) => {
-  // Require Supabase fields when Supabase is selected
-  if (data.provider === 'supabase') {
-    return data.supabaseUrl && data.supabaseAnonKey && data.supabaseServiceKey;
-  }
-  return true;
-}, {
-  message: "Supabase URL, Anonymous Key, and Service Role Key are required for Supabase",
-  path: ["supabaseUrl"],
-});
-
-type AdminSetupForm = z.infer<typeof adminSetupSchema>;
-type DatabaseSetupForm = z.infer<typeof databaseSetupSchema>;
+import { 
+  adminSetupSchema, 
+  databaseSetupSchema, 
+  AdminSetupData, 
+  DatabaseSetupData,
+  validateDatabaseConfig 
+} from "@shared/initialization-config";
 
 interface InitializationWizardProps {
   onComplete: () => void;
@@ -60,9 +33,13 @@ interface InitializationWizardProps {
 
 export default function InitializationWizard({ onComplete }: InitializationWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [adminData, setAdminData] = useState<AdminSetupForm | null>(null);
+  const [adminData, setAdminData] = useState<AdminSetupData | null>(null);
+  const [deploymentContext, setDeploymentContext] = useState<any>(null);
+  const [connectionTestResult, setConnectionTestResult] = useState<any>(null);
+  const [hasTestedConnection, setHasTestedConnection] = useState(false);
+  const [setupRecommendations, setSetupRecommendations] = useState<any>(null);
 
-  const adminForm = useForm<AdminSetupForm>({
+  const adminForm = useForm<AdminSetupData>({
     resolver: zodResolver(adminSetupSchema),
     defaultValues: {
       username: "",
@@ -74,23 +51,51 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     },
   });
 
-  const databaseForm = useForm<DatabaseSetupForm>({
+  const databaseForm = useForm<DatabaseSetupData>({
     resolver: zodResolver(databaseSetupSchema),
     defaultValues: {
       provider: "sqlite",
       name: "Main Database",
+      ssl: true,
+      maxConnections: 10,
+      generateEnvFile: true,
+      useExistingEnv: false,
       supabaseUrl: "",
       supabaseAnonKey: "",
       supabaseServiceKey: "",
+      connectionString: "",
+      host: "",
+      port: "",
+      database: "",
+      username: "",
+      password: "",
+      mysqlHost: "",
+      mysqlPort: "",
+      mysqlDatabase: "",
+      mysqlUsername: "",
+      mysqlPassword: "",
     },
   });
 
   const selectedProvider = databaseForm.watch("provider");
   const providerInfo = databaseProviderInfo[selectedProvider];
 
+  // Fetch deployment context on component mount
+  useState(() => {
+    fetch('/api/initialization/deployment-context')
+      .then(res => res.json())
+      .then(data => {
+        setDeploymentContext(data);
+        if (data.recommendations) {
+          setSetupRecommendations(data.recommendations);
+        }
+      })
+      .catch(console.error);
+  });
+
   // Test database connection mutation
   const testConnectionMutation = useMutation({
-    mutationFn: async (data: DatabaseSetupForm) => {
+    mutationFn: async (data: DatabaseSetupData) => {
       const response = await fetch("/api/initialization/test-database", {
         method: "POST",
         headers: {
@@ -104,7 +109,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
 
   // Initialize application mutation
   const initializationMutation = useMutation({
-    mutationFn: async (data: { admin: AdminSetupForm; database: DatabaseSetupForm }) => {
+    mutationFn: async (data: { admin: AdminSetupData; database: DatabaseSetupData }) => {
       const response = await fetch("/api/initialization", {
         method: "POST",
         headers: {
@@ -128,70 +133,45 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     },
     onError: (error: any) => {
       const errorMessage = error.message || "Failed to initialize the application";
-      
-      // Show detailed error for Supabase setup
-      if (errorMessage.includes("SUPABASE SETUP REQUIRED")) {
-        toast({
-          title: "Supabase Setup Required",
-          description: "Database schema needs to be created. Check console for detailed instructions.",
-          variant: "destructive",
-        });
-        console.error("Supabase Setup Instructions:", errorMessage);
-      } else {
-        toast({
-          title: "Initialization Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "Initialization Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     },
   });
 
-  const [connectionTestResult, setConnectionTestResult] = useState<{ success: boolean; error?: string } | null>(null);
-  const [hasTestedConnection, setHasTestedConnection] = useState(false);
-
-  const handleAdminSubmit = (data: AdminSetupForm) => {
+  const handleAdminSubmit = (data: AdminSetupData) => {
     setAdminData(data);
     setCurrentStep(2);
   };
 
   const handleTestConnection = async () => {
-    const data = databaseForm.getValues();
-    console.log('Form data being sent:', data); // Debug log
-    console.log('Form state errors:', databaseForm.formState.errors); // Debug form errors
+    const formData = databaseForm.getValues();
+    
+    // Validate form data
+    const validation = validateDatabaseConfig(formData);
+    if (!validation.isValid) {
+      toast({
+        title: "Configuration Invalid",
+        description: validation.errors.join(', '),
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setHasTestedConnection(false);
     setConnectionTestResult(null);
     
-    // Validate required fields for Supabase
-    if (data.provider === 'supabase') {
-      console.log('Supabase fields check:', {
-        supabaseUrl: data.supabaseUrl,
-        supabaseAnonKey: data.supabaseAnonKey,
-        supabaseServiceKey: data.supabaseServiceKey,
-        supabaseServiceKeyLength: data.supabaseServiceKey?.length || 0
-      });
-      
-      if (!data.supabaseUrl || !data.supabaseAnonKey || !data.supabaseServiceKey || 
-          data.supabaseUrl.trim() === '' || data.supabaseAnonKey.trim() === '' || data.supabaseServiceKey.trim() === '') {
-        toast({
-          title: "Missing Fields",
-          description: "Please fill in Supabase URL, Anonymous Key, and Service Role Key",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
     try {
-      const result = await testConnectionMutation.mutateAsync(data);
-      console.log("Test connection result:", result); // Debug log
+      const result = await testConnectionMutation.mutateAsync(formData);
       setConnectionTestResult(result);
       setHasTestedConnection(true);
       
       if (result.success) {
         toast({
           title: "Connection Successful",
-          description: "Database connection test passed!",
+          description: `Connected in ${result.latency}ms. ${result.details?.version || ''}`,
         });
       } else {
         toast({
@@ -212,7 +192,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     }
   };
 
-  const handleDatabaseSubmit = (data: DatabaseSetupForm) => {
+  const handleDatabaseSubmit = (data: DatabaseSetupData) => {
     if (adminData) {
       // For non-SQLite providers, require successful connection test
       if (data.provider !== 'sqlite' && (!hasTestedConnection || !connectionTestResult?.success)) {
@@ -231,13 +211,24 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
     }
   };
 
+  const getProviderIcon = (provider: string) => {
+    switch (provider) {
+      case 'supabase': return <Cloud className="w-5 h-5" />;
+      case 'neon': return <Zap className="w-5 h-5" />;
+      case 'planetscale': return <Globe className="w-5 h-5" />;
+      case 'postgresql': return <Database className="w-5 h-5" />;
+      case 'mysql': return <Server className="w-5 h-5" />;
+      case 'sqlite': return <HardDrive className="w-5 h-5" />;
+      default: return <Database className="w-5 h-5" />;
+    }
+  };
+
   const renderProviderFields = () => {
     if (selectedProvider === "sqlite") return null;
 
     return (
       <div className="space-y-4">
         {selectedProvider === "supabase" ? (
-          // Supabase-specific fields
           <>
             <FormField
               control={databaseForm.control}
@@ -248,7 +239,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                   <FormControl>
                     <Input
                       type="text"
-                      placeholder="https://your-project.supabase.co"
+                      placeholder="https://abcdefghijklmnop.supabase.co"
                       {...field}
                     />
                   </FormControl>
@@ -275,7 +266,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                     />
                   </FormControl>
                   <FormDescription>
-                    Your Supabase anonymous (public) key from the dashboard
+                    Public API key from Settings → API → Project API keys
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -297,14 +288,14 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                     />
                   </FormControl>
                   <FormDescription>
-                    Your Supabase service role key for automatic table creation (Settings → API → Service Role Key)
+                    Service role key from Settings → API → Service Role Key (required for table creation)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
           </>
-        ) : selectedProvider === "neon" || selectedProvider === "planetscale" ? (
+        ) : (selectedProvider === "neon" || selectedProvider === "planetscale") ? (
           <FormField
             control={databaseForm.control}
             name="connectionString"
@@ -314,97 +305,503 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                 <FormControl>
                   <Input
                     type="text"
-                    placeholder={`${selectedProvider === "neon" ? "postgresql" : "mysql"}://username:password@host/database`}
+                    placeholder={selectedProvider === "neon" 
+                      ? "postgresql://username:password@ep-xxx-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require"
+                      : "mysql://username:password@aws.connect.psdb.cloud/database?ssl={\"rejectUnauthorized\":true}"
+                    }
                     {...field}
                   />
                 </FormControl>
                 <FormDescription>
-                  Your {providerInfo.name} connection string from the dashboard
+                  Get this from your {providerInfo.name} dashboard → Connection Details
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-4">
+        ) : selectedProvider === "postgresql" ? (
+          <Tabs defaultValue="connection-string" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="connection-string">Connection String</TabsTrigger>
+              <TabsTrigger value="individual-fields">Individual Fields</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="connection-string" className="space-y-4">
               <FormField
                 control={databaseForm.control}
-                name="host"
+                name="connectionString"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Host</FormLabel>
+                    <FormLabel>PostgreSQL Connection String</FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder="localhost" {...field} />
+                      <Input
+                        type="text"
+                        placeholder="postgresql://username:password@hostname:5432/database?sslmode=require"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Complete PostgreSQL connection URL
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </TabsContent>
+            
+            <TabsContent value="individual-fields" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={databaseForm.control}
+                  name="host"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Host</FormLabel>
+                      <FormControl>
+                        <Input placeholder="localhost" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={databaseForm.control}
+                  name="port"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Port</FormLabel>
+                      <FormControl>
+                        <Input placeholder="5432" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={databaseForm.control}
+                name="database"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Database Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="finance_tracker" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={databaseForm.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="postgres" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={databaseForm.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : selectedProvider === "mysql" ? (
+          <Tabs defaultValue="connection-string" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="connection-string">Connection String</TabsTrigger>
+              <TabsTrigger value="individual-fields">Individual Fields</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="connection-string" className="space-y-4">
               <FormField
                 control={databaseForm.control}
-                name="port"
+                name="connectionString"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Port</FormLabel>
+                    <FormLabel>MySQL Connection String</FormLabel>
                     <FormControl>
-                      <Input type="text" placeholder={providerInfo.defaultPort?.toString() || ""} {...field} />
+                      <Input
+                        type="text"
+                        placeholder="mysql://username:password@hostname:3306/database?ssl=true"
+                        {...field}
+                      />
                     </FormControl>
+                    <FormDescription>
+                      Complete MySQL connection URL
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </TabsContent>
+            
+            <TabsContent value="individual-fields" className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={databaseForm.control}
+                  name="mysqlHost"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Host</FormLabel>
+                      <FormControl>
+                        <Input placeholder="localhost" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={databaseForm.control}
+                  name="mysqlPort"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Port</FormLabel>
+                      <FormControl>
+                        <Input placeholder="3306" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={databaseForm.control}
+                name="mysqlDatabase"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Database Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="finance_tracker" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={databaseForm.control}
+                  name="mysqlUsername"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="root" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={databaseForm.control}
+                  name="mysqlPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : null}
+        
+        {/* SSL and Advanced Options */}
+        {selectedProvider !== "sqlite" && (
+          <div className="space-y-4 pt-4 border-t">
+            <h4 className="font-medium">Connection Options</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={databaseForm.control}
+                name="ssl"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>SSL Connection</FormLabel>
+                      <FormDescription className="text-xs">
+                        Use SSL for secure connections
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={databaseForm.control}
+                name="maxConnections"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Max Connections</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 10)}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Connection pool size
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            <FormField
-              control={databaseForm.control}
-              name="database"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Database Name</FormLabel>
-                  <FormControl>
-                    <Input type="text" placeholder={selectedProvider === "mysql" ? "mysql" : "postgres"} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={databaseForm.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input type="text" placeholder={selectedProvider === "mysql" ? "root" : "postgres"} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={databaseForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </>
+          </div>
         )}
+      </div>
+    );
+  };
+
+  const renderEnvironmentOptions = () => (
+    <div className="space-y-4 pt-4 border-t">
+      <h4 className="font-medium flex items-center gap-2">
+        <Settings className="w-4 h-4" />
+        Environment Configuration
+      </h4>
+      
+      {deploymentContext?.hasEnvFile && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Existing .env file detected. You can use existing configuration or generate a new one.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="space-y-3">
+        <FormField
+          control={databaseForm.control}
+          name="generateEnvFile"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <FormLabel>Generate .env File</FormLabel>
+                <FormDescription className="text-xs">
+                  Automatically create environment configuration
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+        
+        {deploymentContext?.hasEnvFile && (
+          <FormField
+            control={databaseForm.control}
+            name="useExistingEnv"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <FormLabel>Use Existing .env</FormLabel>
+                  <FormDescription className="text-xs">
+                    Keep current environment variables
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        )}
+      </div>
+      
+      {deploymentContext?.isDocker && (
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>
+            Docker deployment detected. Docker Compose override will be generated automatically.
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+
+  const renderDeploymentInfo = () => {
+    if (!deploymentContext) return null;
+    
+    return (
+      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+        <div className="flex items-start space-x-3">
+          <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+            {deploymentContext.isDocker ? <Database className="w-5 h-5" /> : <Server className="w-5 h-5" />}
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-medium text-blue-900 dark:text-blue-100">
+              {deploymentContext.isDocker ? 'Docker Deployment Detected' : 'Standalone Deployment'}
+            </h4>
+            <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+              {setupRecommendations && (
+                <>
+                  <p><strong>Recommended:</strong> {setupRecommendations.recommendedProvider}</p>
+                  {setupRecommendations.recommendations.map((rec: string, i: number) => (
+                    <p key={i}>• {rec}</p>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderProviderRecommendations = () => {
+    if (!deploymentContext) return null;
+    
+    const recommendations = [
+      {
+        provider: 'supabase',
+        icon: <Cloud className="w-6 h-6" />,
+        title: 'Supabase',
+        description: 'Recommended for production',
+        pros: ['Automatic scaling', 'Built-in auth', 'Real-time features', 'Automatic backups'],
+        badge: 'Recommended'
+      },
+      {
+        provider: 'sqlite',
+        icon: <HardDrive className="w-6 h-6" />,
+        title: 'SQLite',
+        description: 'Perfect for development',
+        pros: ['No setup required', 'File-based', 'Fast for small datasets', 'Easy backup'],
+        badge: deploymentContext.isDocker ? null : 'Development'
+      },
+      {
+        provider: 'neon',
+        icon: <Zap className="w-6 h-6" />,
+        title: 'Neon',
+        description: 'Serverless PostgreSQL',
+        pros: ['Serverless', 'Branching', 'Auto-scaling', 'PostgreSQL compatible'],
+        badge: null
+      }
+    ];
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {recommendations.map((rec) => (
+          <Card 
+            key={rec.provider}
+            className={`cursor-pointer transition-all hover:shadow-md ${
+              selectedProvider === rec.provider ? 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950/20' : ''
+            }`}
+            onClick={() => databaseForm.setValue('provider', rec.provider as any)}
+          >
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  {rec.icon}
+                  <h3 className="font-medium">{rec.title}</h3>
+                </div>
+                {rec.badge && (
+                  <Badge variant={rec.badge === 'Recommended' ? 'default' : 'secondary'} className="text-xs">
+                    {rec.badge}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">{rec.description}</p>
+              <ul className="text-xs text-muted-foreground space-y-1">
+                {rec.pros.map((pro, i) => (
+                  <li key={i}>• {pro}</li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  const renderConnectionTestResult = () => {
+    if (!hasTestedConnection || !connectionTestResult) return null;
+    
+    return (
+      <div className={`p-4 rounded-lg border ${
+        connectionTestResult.success 
+          ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+          : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+      }`}>
+        <div className="flex items-start space-x-3">
+          {connectionTestResult.success ? (
+            <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+          )}
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-2">
+              <span className={`font-medium ${
+                connectionTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
+              }`}>
+                {connectionTestResult.success ? 'Connection Successful' : 'Connection Failed'}
+              </span>
+              {connectionTestResult.latency && (
+                <span className="text-xs text-muted-foreground">
+                  {connectionTestResult.latency}ms
+                </span>
+              )}
+            </div>
+            
+            {connectionTestResult.success && connectionTestResult.details && (
+              <div className="text-sm space-y-1">
+                <p><strong>Host:</strong> {connectionTestResult.details.host}</p>
+                <p><strong>Database:</strong> {connectionTestResult.details.database}</p>
+                <p><strong>Version:</strong> {connectionTestResult.details.version}</p>
+                {connectionTestResult.details.missingTables && connectionTestResult.details.missingTables.length > 0 && (
+                  <p className="text-yellow-600">
+                    <strong>Note:</strong> {connectionTestResult.details.missingTables.length} tables will be created automatically
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {connectionTestResult.error && (
+              <p className="text-sm text-red-600 dark:text-red-300 mt-1">
+                {connectionTestResult.error}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-4xl">
         <CardHeader className="text-center">
           <div className="flex items-center justify-center mb-4">
             <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
@@ -413,7 +810,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
           </div>
           <CardTitle className="text-2xl">Welcome to Finance Tracker</CardTitle>
           <CardDescription>
-            Let's set up your personal finance management system
+            Professional-grade personal finance management system
           </CardDescription>
           
           {/* Progress indicator */}
@@ -434,7 +831,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="space-y-6">
           {currentStep === 1 && (
             <Form {...adminForm}>
               <form onSubmit={adminForm.handleSubmit(handleAdminSubmit)} className="space-y-6">
@@ -515,6 +912,9 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                         <FormControl>
                           <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          Minimum 8 characters
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -546,89 +946,71 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
             <Form {...databaseForm}>
               <form onSubmit={databaseForm.handleSubmit(handleDatabaseSubmit)} className="space-y-6">
                 <div className="text-center mb-6">
-                  <h3 className="text-lg font-semibold">Choose Database Provider</h3>
+                  <h3 className="text-lg font-semibold">Database Configuration</h3>
                   <p className="text-sm text-muted-foreground">
-                    Select and configure your preferred database system
+                    Choose and configure your database provider
                   </p>
                 </div>
 
+                {renderDeploymentInfo()}
+                
                 <FormField
                   control={databaseForm.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Database Name</FormLabel>
+                      <FormLabel>Configuration Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Main Database" {...field} />
+                        <Input placeholder="Production Database" {...field} />
                       </FormControl>
                       <FormDescription>
-                        A friendly name for your database configuration
+                        A friendly name for this database configuration
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={databaseForm.control}
-                  name="provider"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Database Provider</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a database provider" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {supportedDatabaseProviders.map((provider) => {
-                            const info = databaseProviderInfo[provider];
-                            return (
-                              <SelectItem key={provider} value={provider}>
-                                <div className="flex items-center justify-between w-full">
-                                  <span>{info.name}</span>
-                                  {provider === "sqlite" && (
-                                    <Badge variant="secondary" className="ml-2">Recommended</Badge>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        {providerInfo.description}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div>
+                  <FormLabel className="text-base font-medium mb-4 block">Choose Database Provider</FormLabel>
+                  {renderProviderRecommendations()}
+                  
+                  <FormField
+                    control={databaseForm.control}
+                    name="provider"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a database provider" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {supportedDatabaseProviders.map((provider) => {
+                              const info = databaseProviderInfo[provider];
+                              return (
+                                <SelectItem key={provider} value={provider}>
+                                  <div className="flex items-center gap-2">
+                                    {getProviderIcon(provider)}
+                                    <div>
+                                      <div className="font-medium">{info.name}</div>
+                                      <div className="text-xs text-muted-foreground">{info.description}</div>
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 {renderProviderFields()}
-
-                {/* Special guidance for Supabase */}
-                {selectedProvider === 'supabase' && (
-                  <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <div className="flex items-start space-x-3">
-                      <div className="text-green-600 dark:text-green-400 mt-0.5">
-                        <CheckCircle2 className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-green-900 dark:text-green-100">Fully Automatic Supabase Setup</h4>
-                        <p className="text-sm text-green-800 dark:text-green-200">
-                          Complete automation using Supabase Management API. Database tables created automatically without any manual work.
-                        </p>
-                        <div className="text-xs text-green-700 dark:text-green-300 space-y-1">
-                          <p>• Provide your Supabase Project URL, Anonymous Key, and Service Role Key</p>
-                          <p>• Test connection to verify credentials</p>
-                          <p>• Complete setup - all tables created automatically via Management API</p>
-                          <p>• Zero manual work - fully hands-off like Hostinger Horizons</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {renderEnvironmentOptions()}
 
                 {/* Connection Test Section for external databases */}
                 {selectedProvider !== 'sqlite' && (
@@ -645,6 +1027,7 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                         variant="outline"
                         onClick={handleTestConnection}
                         disabled={testConnectionMutation.isPending}
+                        className="min-w-[120px]"
                       >
                         {testConnectionMutation.isPending ? (
                           <>
@@ -660,36 +1043,26 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                       </Button>
                     </div>
 
-                    {/* Connection Test Result */}
-                    {hasTestedConnection && connectionTestResult && (
-                      <div className={`p-4 rounded-lg border ${
-                        connectionTestResult.success 
-                          ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
-                          : 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-                      }`}>
-                        <div className="flex items-center space-x-2">
-                          {connectionTestResult.success ? (
-                            <CheckCircle2 className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <AlertTriangle className="w-5 h-5 text-red-600" />
-                          )}
-                          <span className={`font-medium ${
-                            connectionTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'
-                          }`}>
-                            {connectionTestResult.success ? 'Connection Successful' : 'Connection Failed'}
-                          </span>
-                        </div>
-                        {connectionTestResult.error && (
-                          <p className="text-sm text-red-600 dark:text-red-300 mt-1">
-                            {connectionTestResult.error}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    {renderConnectionTestResult()}
                   </div>
                 )}
 
-                <Separator />
+                {/* Provider-specific guidance */}
+                {selectedProvider !== 'sqlite' && (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>{providerInfo.name} Setup:</strong> {providerInfo.description}
+                      {selectedProvider === 'supabase' && (
+                        <div className="mt-2 text-xs space-y-1">
+                          <p>• Get credentials from Supabase Dashboard → Settings → API</p>
+                          <p>• Tables will be created automatically</p>
+                          <p>• No manual SQL execution required</p>
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 <div className="flex space-x-4">
                   <Button
@@ -706,8 +1079,17 @@ export default function InitializationWizard({ onComplete }: InitializationWizar
                     className="flex-1"
                     disabled={initializationMutation.isPending}
                   >
-                    {initializationMutation.isPending ? "Setting up..." : "Complete Setup"}
-                    <CheckCircle className="ml-2 w-4 h-4" />
+                    {initializationMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                        Initializing...
+                      </>
+                    ) : (
+                      <>
+                        Complete Setup
+                        <CheckCircle className="ml-2 w-4 h-4" />
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
