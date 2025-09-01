@@ -193,6 +193,7 @@ Environment Variables:
     DATABASE_URL=mysql://user:pass@host:port/db
 `);
 }
+
 // Usage: node scripts/setup-database-config.js [command] [options]
 function detectConfiguration() {
   console.log('🔍 Detecting database configuration...\n');
@@ -227,6 +228,9 @@ function detectConfiguration() {
     case 'sqlite':
       console.log(`  Database Path: ${env.SQLITE_DATABASE_PATH || './data/finance.db'}`);
       break;
+  }
+}
+
 function generateConfiguration(provider) {
   if (!provider) {
     console.log('❌ Provider is required. Use: generate [provider]');
@@ -310,7 +314,7 @@ function generateConfiguration(provider) {
   console.log('2. Run: node scripts/setup-database-config.js validate');
   console.log('3. Start the application: npm run dev');
 }
-  }
+
 function createTemplate(provider) {
   if (!provider) {
     console.log('❌ Provider is required. Use: template [provider]');
@@ -395,7 +399,7 @@ function validateConfiguration() {
   console.log('  Production: npm start');
   console.log('  Docker: docker-compose up -d');
 }
-  console.log(`\n✓ Configuration appears valid for ${provider}`);
+
 function resetConfiguration() {
   console.log('🔄 Resetting database configuration...\n');
   
@@ -418,7 +422,6 @@ function resetConfiguration() {
   
   console.log('\n✅ Configuration reset complete');
   console.log('Run the initialization wizard or use this script to set up a new configuration.');
-}
 }
 // Main execution
 switch (command) {
